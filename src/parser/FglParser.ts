@@ -56,10 +56,10 @@ const R = {
   // PUBLIC|PRIVATE FUNCTION name(params) RETURNS(types)
   // e.g.  PUBLIC FUNCTION regLoop() RETURNS()
   //       PRIVATE FUNCTION inputReg(mode CHAR(1)) RETURNS(BOOLEAN)
-  funcDecl: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s+(\w+)\s*\((.*?)\)\s+RETURNS\s*\((.*?)\)\s*$/i,
+  funcDecl: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   // Type-method: PUBLIC FUNCTION (self TTypeName) methodName(params) RETURNS(types)
-  typeMethod: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s*\(\s*\w+\s+(\w+)\s*\)\s+(\w+)\s*\((.*?)\)\s+RETURNS\s*\((.*?)\)\s*$/i,
+  typeMethod: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s*\(\s*\w+\s+(\w+)\s*\)\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   // MAIN block
   mainBlock: /^\s*MAIN\s*$/i,
@@ -272,7 +272,7 @@ export class FglParser {
             isTypeMethod: true,
             typeName: tm[2],
             params: parseParams(tm[4]),
-            returns: parseReturns(tm[5]),
+            returns: parseReturns(tm[5] ?? ''),
             startLine: lineNumber,
             directCalls: [],
           };
@@ -289,7 +289,7 @@ export class FglParser {
             visibility: fn[1].toUpperCase() as 'PUBLIC' | 'PRIVATE',
             isTypeMethod: false,
             params: parseParams(fn[3]),
-            returns: parseReturns(fn[4]),
+            returns: parseReturns(fn[4] ?? ''),
             startLine: lineNumber,
             directCalls: [],
           };
@@ -322,9 +322,9 @@ export class FglParser {
         while (stack.length > 1 && stack[stack.length - 1].kind !== 'FUNCTION') {
           stack.pop();
         }
-        // Pop the FUNCTION frame itself
-        const funcFrame = stack.pop() as FunctionFrame | undefined;
-        if (funcFrame && funcFrame.kind === 'FUNCTION') {
+        // Pop the FUNCTION frame itself -- guard so ROOT is never popped by an unmatched END FUNCTION
+        if (stack.length > 0 && stack[stack.length - 1].kind === 'FUNCTION') {
+          const funcFrame = stack.pop() as FunctionFrame;
           const sig: FunctionSignature = {
             name: funcFrame.name,
             displayName: funcFrame.isTypeMethod

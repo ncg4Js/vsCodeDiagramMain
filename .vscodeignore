@@ -6,3 +6,4 @@ tsconfig.json
 .vscodeignore
 FEASIBILITY.md
 IMPLEMENTATION_REPORT.md
+.gitignore
