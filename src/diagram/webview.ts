@@ -4,6 +4,7 @@ import { AppGraph, DiagramOptions } from '../types';
 import { renderMermaid } from './MermaidRenderer';
 
 const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+const WEBVIEW_VERSION = '0.00';
 
 export class DiagramPanel {
   private static instance: DiagramPanel | undefined;
@@ -161,6 +162,7 @@ export class DiagramPanel {
   <button id="btn-export">&#8615; Export SVG</button>
   <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
+  <span id="ver" style="font-size:10px;opacity:0.5;margin-left:6px">v${WEBVIEW_VERSION}</span>
 </div>
 <div id="diagram-wrap">
   <div id="loading">Generating diagram…</div>
