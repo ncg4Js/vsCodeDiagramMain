@@ -1,0 +1,93 @@
+{
+  "name": "genero-app-diagram",
+  "displayName": "Genero Application Diagram",
+  "description": "Generate dependency and call-flow diagrams for Genero BDL (.4gl) applications",
+  "version": "0.1.0",
+  "publisher": "fourjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ncg4Js/vsCodeDiagramMain.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ncg4Js/vsCodeDiagramMain/issues"
+  },
+  "homepage": "https://github.com/ncg4Js/vsCodeDiagramMain#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Visualization", "Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "genero-app-diagram.generate",
+        "title": "Genero: Generate Application Diagram",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "genero-app-diagram.generate",
+          "when": "resourceExtname == .4gl",
+          "group": "navigation@99"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "genero-app-diagram.generate",
+          "when": "resourceExtname == .4gl",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Genero App Diagram",
+      "properties": {
+        "generoAppDiagram.fglldpath": {
+          "type": "string",
+          "default": "",
+          "description": "Override FGLLDPATH for module search (semicolon-separated on Windows, colon-separated on Linux/Mac). Leave empty to use the environment variable."
+        },
+        "generoAppDiagram.fglresourcepath": {
+          "type": "string",
+          "default": "",
+          "description": "Override FGLRESOURCEPATH. Leave empty to use the environment variable."
+        },
+        "generoAppDiagram.maxDepth": {
+          "type": "number",
+          "default": 2,
+          "minimum": -1,
+          "description": "Default diagram traversal depth. 0 = entry module only, -1 = unlimited."
+        },
+        "generoAppDiagram.showPrivateFunctions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show PRIVATE functions in the diagram."
+        },
+        "generoAppDiagram.showFieldEvents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show ON CHANGE / BEFORE FIELD / AFTER FIELD event edges."
+        },
+        "generoAppDiagram.showExternalModules": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show references to modules not found in the workspace or search paths."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

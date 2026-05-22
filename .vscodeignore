@@ -1,0 +1,8 @@
+src/**
+node_modules/**
+.vscode-test/**
+*.vsix
+tsconfig.json
+.vscodeignore
+FEASIBILITY.md
+IMPLEMENTATION_REPORT.md
