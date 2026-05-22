@@ -49,6 +49,8 @@ export function activate(context: vscode.ExtensionContext): void {
       let cancelFlag = false;
       panel.setCancelCallback(() => { cancelFlag = true; });
 
+      const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+
       const rebuild = async (opts: DiagramOptions): Promise<void> => {
         cancelFlag = false;
         panel.setCancelCallback(() => { cancelFlag = true; });
@@ -59,15 +61,15 @@ export function activate(context: vscode.ExtensionContext): void {
             token.onCancellationRequested(() => { cancelFlag = true; });
             setProgressReporter(msg => progress.report({ message: msg }));
             try {
-              log(`Building diagram for ${entryLabel}...`);
-              log('Resolving search paths...');
+              log(`Building diagram for ${entryLabel}...`);   await tick();
+              log('Resolving search paths...');               await tick();
               const searchPaths = resolveSearchPaths(entryDir);
-              log('Indexing .4gl modules...');
+              log('Indexing .4gl modules...');                await tick();
               const resolver    = new ModuleResolver(searchPaths);
-              log('Traversing call graph...');
+              log('Traversing call graph...');                await tick();
               const builder     = new GraphBuilder(resolver);
               const graph       = builder.build(filePath, opts, () => cancelFlag);
-              log('Rendering diagram...');
+              log('Rendering diagram...');                    await tick();
               panel.updateGraph(graph);
               log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);
             } catch (err) {

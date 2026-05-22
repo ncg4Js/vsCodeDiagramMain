@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\"; npx tsc -p ./ 2>&1; Write-Host \"Exit: $LASTEXITCODE\")",
+      "Bash(git commit -m ' *)",
+      "Bash(cat)",
+      "Bash(python /tmp/patch_webview.py)",
+      "PowerShell(\\(Get-Item 'c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-app-diagram-0.1.0.vsix'\\).LastWriteTime)",
+      "Bash(npx tsc *)",
+      "Bash(code --install-extension \"C:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-app-diagram-0.1.0.vsix\" --force)",
+      "Bash(code --install-extension \"genero-app-diagram-0.1.0.vsix\" --force)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ncgod\\.claude"
+    ]
+  }
+}

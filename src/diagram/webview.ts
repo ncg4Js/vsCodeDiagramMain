@@ -4,12 +4,14 @@ import { AppGraph, DiagramOptions } from '../types';
 import { renderMermaid } from './MermaidRenderer';
 
 const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
-const WEBVIEW_VERSION = '0.00';
+const WEBVIEW_VERSION = '0.09';
+const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
 export class DiagramPanel {
   private static instance: DiagramPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
-  private currentGraph: AppGraph | undefined;
+  private readonly context: vscode.ExtensionContext;
+  private readonly entryLabel: string;
   private currentOptions: DiagramOptions;
   private onRefreshRequest:  ((opts: DiagramOptions) => void) | undefined;
   private onCancelRequest:   (() => void) | undefined;
@@ -19,6 +21,8 @@ export class DiagramPanel {
     entryLabel: string,
     options: DiagramOptions,
   ) {
+    this.context = context;
+    this.entryLabel = entryLabel;
     this.currentOptions = options;
     this.panel = vscode.window.createWebviewPanel(
       'generoAppDiagram',
@@ -31,7 +35,7 @@ export class DiagramPanel {
       },
     );
 
-    this.panel.webview.html = this.buildHtml('');
+    this.panel.webview.html = this.buildHtml();
     this.panel.onDidDispose(() => { DiagramPanel.instance = undefined; }, null, context.subscriptions);
 
     this.panel.webview.onDidReceiveMessage(msg => {
@@ -41,15 +45,15 @@ export class DiagramPanel {
           break;
         case 'refresh':
           this.currentOptions = {
-            maxDepth:          msg.depth      as number,
-            showPrivate:       msg.showPrivate as boolean,
-            showFieldEvents:   msg.showFieldEvents as boolean,
-            showExternalModules: msg.showExternal as boolean,
+            maxDepth:            msg.depth          as number,
+            showPrivate:         msg.showPrivate     as boolean,
+            showFieldEvents:     msg.showFieldEvents as boolean,
+            showExternalModules: msg.showExternal    as boolean,
           };
           this.onRefreshRequest?.(this.currentOptions);
           break;
         case 'export':
-          this.exportSvg(msg.data as string, entryLabel);
+          this.exportDiagram(msg.svg as string);
           break;
         case 'cancel':
           this.onCancelRequest?.();
@@ -80,7 +84,6 @@ export class DiagramPanel {
   }
 
   updateGraph(graph: AppGraph): void {
-    this.currentGraph = graph;
     const { mermaid, nodeCount, edgeCount } = renderMermaid(graph, this.currentOptions);
     this.panel.webview.postMessage({
       type:    'update',
@@ -99,18 +102,46 @@ export class DiagramPanel {
     });
   }
 
-  private async exportSvg(svgData: string, label: string): Promise<void> {
+  private async exportDiagram(svgData: string): Promise<void> {
+    if (!svgData) {
+      vscode.window.showWarningMessage('No diagram rendered yet.');
+      return;
+    }
+    const lastFolder = this.context.globalState.get<string>(LAST_FOLDER_KEY);
+    const safeName   = this.entryLabel.replace(/\W+/g, '_');
+    const timestamp  = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const suggested  = lastFolder
+      ? vscode.Uri.file(path.join(lastFolder, `${safeName}_${timestamp}.html`))
+      : vscode.Uri.file(`${safeName}_${timestamp}.html`);
+
     const uri = await vscode.window.showSaveDialog({
-      defaultUri: vscode.Uri.file(`${label.replace(/\W+/g, '_')}_diagram.svg`),
-      filters:    { 'SVG files': ['svg'] },
+      defaultUri: suggested,
+      filters:    { 'HTML files': ['html'] },
     });
     if (!uri) { return; }
-    const enc = new TextEncoder();
-    await vscode.workspace.fs.writeFile(uri, enc.encode(svgData));
-    vscode.window.showInformationMessage(`Diagram exported to ${uri.fsPath}`);
+    await this.context.globalState.update(LAST_FOLDER_KEY, path.dirname(uri.fsPath));
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${this.entryLabel} Diagram</title>
+<style>
+  body { margin: 0; padding: 16px; background: #1e1e1e;
+         display: flex; justify-content: center; align-items: flex-start; }
+  svg  { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+${svgData}
+</body>
+</html>`;
+
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(html));
+    await vscode.env.openExternal(uri);
   }
 
-  private buildHtml(initialDiagram: string): string {
+  private buildHtml(): string {
     const opts = this.currentOptions;
     const nonce = Math.random().toString(36).slice(2);
 
@@ -138,7 +169,13 @@ export class DiagramPanel {
   #toolbar button:hover { background:var(--vscode-button-hoverBackground); }
   #stats  { font-size:11px; color:var(--vscode-descriptionForeground); margin-left:auto; }
   #diagram-wrap { overflow:auto; padding:16px; min-height:calc(100vh - 52px); }
-  .mermaid { font-family: var(--vscode-font-family); }
+  #diagram-text {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size:   var(--vscode-editor-font-size, 12px);
+    white-space: pre; background: var(--vscode-textCodeBlock-background, #1e1e1e);
+    color: var(--vscode-editor-foreground); padding: 12px; border-radius: 4px;
+    border: 1px solid var(--vscode-panel-border); overflow: auto; tab-size: 4; margin: 0;
+  }
   #loading { padding:24px; color:var(--vscode-descriptionForeground); }
 </style>
 </head>
@@ -159,50 +196,34 @@ export class DiagramPanel {
   <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents   ? 'checked' : ''}> Field events</label>
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>
-  <button id="btn-export">&#8615; Export SVG</button>
+  <button id="btn-export">&#8615; Export Diagram</button>
   <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
   <span id="ver" style="font-size:10px;opacity:0.5;margin-left:6px">v${WEBVIEW_VERSION}</span>
 </div>
 <div id="diagram-wrap">
   <div id="loading">Generating diagram…</div>
-  <div class="mermaid" id="diagram" style="display:none">${initialDiagram}</div>
+  <pre id="diagram-text" style="display:none"></pre>
 </div>
+<div id="diagram-render" class="mermaid" style="position:absolute;left:-9999px;top:0;width:800px"></div>
 
 <script nonce="${nonce}" src="${MERMAID_CDN}"></script>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+let mermaidSource = '';
 
 mermaid.initialize({
   startOnLoad: false,
   theme: document.body.classList.contains('vscode-light') ? 'default' : 'dark',
-  flowchart: { useMaxWidth: true, htmlLabels: true },
+  flowchart: { useMaxWidth: false, htmlLabels: false },
   securityLevel: 'loose',
   maxTextSize: 500000,
   maxEdges: 1000,
 });
 
-// Called by Mermaid click directives
 window.navigateTo = function(filePath, lineNumber) {
   vscode.postMessage({ type: 'navigate', filePath, lineNumber: parseInt(lineNumber, 10) || 1 });
 };
-
-async function renderDiagram(source) {
-  const el = document.getElementById('diagram');
-  const loading = document.getElementById('loading');
-  if (!source) { return; }
-  try {
-    el.removeAttribute('data-processed');
-    el.textContent = source;
-    await mermaid.run({ querySelector: '#diagram' });
-    el.style.display = '';
-    loading.style.display = 'none';
-  } catch (err) {
-    loading.textContent = 'Render error: ' + err.message;
-    loading.style.display = '';
-    el.style.display = 'none';
-  }
-}
 
 document.getElementById('btn-refresh').addEventListener('click', () => {
   vscode.postMessage({
@@ -214,15 +235,22 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   });
 });
 
-document.getElementById('btn-export').addEventListener('click', () => {
-  const svg = document.querySelector('#diagram svg');
-  if (svg) {
-    vscode.postMessage({ type: 'export', data: new XMLSerializer().serializeToString(svg) });
-  } else {
-    vscode.postMessage({ type: 'export', data: '' });
-  }
-});
+document.getElementById('btn-export').addEventListener('click', () => renderAndExport());
 
+async function renderAndExport() {
+  if (!mermaidSource) { return; }
+  const renderEl = document.getElementById('diagram-render');
+  try {
+    renderEl.removeAttribute('data-processed');
+    renderEl.textContent = mermaidSource;
+    await mermaid.run({ querySelector: '#diagram-render' });
+    const svgEl = renderEl.querySelector('svg');
+    const svg   = svgEl ? new XMLSerializer().serializeToString(svgEl) : '';
+    vscode.postMessage({ type: 'export', svg });
+  } catch (err) {
+    vscode.postMessage({ type: 'export', svg: '' });
+  }
+}
 
 document.getElementById('btn-cancel').addEventListener('click', () => {
   vscode.postMessage({ type: 'cancel' });
@@ -231,8 +259,14 @@ document.getElementById('btn-cancel').addEventListener('click', () => {
 window.addEventListener('message', async event => {
   const msg = event.data;
   if (msg.type === 'update') {
+    mermaidSource = msg.diagram ?? '';
     document.getElementById('stats').textContent = msg.stats ?? '';
-    await renderDiagram(msg.diagram);
+    const textEl  = document.getElementById('diagram-text');
+    const loading = document.getElementById('loading');
+    textEl.textContent    = mermaidSource;
+    textEl.style.display  = mermaidSource ? '' : 'none';
+    loading.style.display = mermaidSource ? 'none' : '';
+    if (mermaidSource) { await renderAndExport(); }
   }
 });
 </script>
