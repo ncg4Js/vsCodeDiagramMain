@@ -62,8 +62,9 @@ const R = {
   typeMethod: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s*\(\s*\w+\s+(\w+)\s*\)\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   // MAIN block
-  mainBlock: /^\s*MAIN\s*$/i,
-  funcMain:  /^\s*FUNCTION\s+MAIN\s*\(\s*\)(?:\s+RETURNS\s*\(\s*\))?\s*$/i,
+  mainBlock:    /^\s*MAIN\s*$/i,
+  // Bare FUNCTION (no PUBLIC/PRIVATE) — treated as PUBLIC; superset of funcMain
+  funcDeclBare: /^\s*FUNCTION\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   endFunction: /^\s*END\s+FUNCTION\b/i,
   endMain:     /^\s*END\s+MAIN\b/i,
@@ -299,16 +300,17 @@ export class FglParser {
           continue;
         }
 
-        // FUNCTION MAIN() without visibility modifier — also an entry point
-        if (top.kind === 'ROOT' && R.funcMain.test(line)) {
-          result.hasMain = true;
+        // Bare FUNCTION (no PUBLIC/PRIVATE) — treated as PUBLIC
+        const bare = R.funcDeclBare.exec(line);
+        if (bare) {
+          if (bare[1].toUpperCase() === 'MAIN') { result.hasMain = true; }
           stack.push({
             kind: 'FUNCTION',
-            name: 'MAIN',
+            name: bare[1],
             visibility: 'PUBLIC',
             isTypeMethod: false,
-            params: [],
-            returns: [],
+            params: parseParams(bare[2]),
+            returns: parseReturns(bare[3] ?? ''),
             startLine: lineNumber,
             directCalls: [],
           });

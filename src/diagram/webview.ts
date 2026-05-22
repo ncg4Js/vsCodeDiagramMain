@@ -10,7 +10,8 @@ export class DiagramPanel {
   private readonly panel: vscode.WebviewPanel;
   private currentGraph: AppGraph | undefined;
   private currentOptions: DiagramOptions;
-  private onRefreshRequest: ((opts: DiagramOptions) => void) | undefined;
+  private onRefreshRequest:  ((opts: DiagramOptions) => void) | undefined;
+  private onCancelRequest:   (() => void) | undefined;
 
   private constructor(
     context: vscode.ExtensionContext,
@@ -49,6 +50,9 @@ export class DiagramPanel {
         case 'export':
           this.exportSvg(msg.data as string, entryLabel);
           break;
+        case 'cancel':
+          this.onCancelRequest?.();
+          break;
       }
     }, undefined, context.subscriptions);
   }
@@ -68,6 +72,10 @@ export class DiagramPanel {
 
   setRefreshCallback(cb: (opts: DiagramOptions) => void): void {
     this.onRefreshRequest = cb;
+  }
+
+  setCancelCallback(cb: (() => void) | undefined): void {
+    this.onCancelRequest = cb;
   }
 
   updateGraph(graph: AppGraph): void {
@@ -151,6 +159,7 @@ export class DiagramPanel {
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>
   <button id="btn-export">&#8615; Export SVG</button>
+  <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
 </div>
 <div id="diagram-wrap">
@@ -167,6 +176,8 @@ mermaid.initialize({
   theme: document.body.classList.contains('vscode-light') ? 'default' : 'dark',
   flowchart: { useMaxWidth: true, htmlLabels: true },
   securityLevel: 'loose',
+  maxTextSize: 500000,
+  maxEdges: 1000,
 });
 
 // Called by Mermaid click directives
@@ -208,6 +219,11 @@ document.getElementById('btn-export').addEventListener('click', () => {
   } else {
     vscode.postMessage({ type: 'export', data: '' });
   }
+});
+
+
+document.getElementById('btn-cancel').addEventListener('click', () => {
+  vscode.postMessage({ type: 'cancel' });
 });
 
 window.addEventListener('message', async event => {

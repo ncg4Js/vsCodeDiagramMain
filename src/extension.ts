@@ -46,7 +46,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const panel = DiagramPanel.getOrCreate(context, entryLabel, options);
 
+      let cancelFlag = false;
+      panel.setCancelCallback(() => { cancelFlag = true; });
+
       const rebuild = async (opts: DiagramOptions): Promise<void> => {
+        cancelFlag = false;
+        panel.setCancelCallback(() => { cancelFlag = true; });
         await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Window, title: 'Genero App Diagram' },
           async (progress) => {
@@ -59,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
               const resolver    = new ModuleResolver(searchPaths);
               log('Traversing call graph…');
               const builder     = new GraphBuilder(resolver);
-              const graph       = builder.build(filePath, opts);
+              const graph       = builder.build(filePath, opts, () => cancelFlag);
               log('Rendering diagram…');
               panel.updateGraph(graph);
               log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);

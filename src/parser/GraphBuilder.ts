@@ -38,7 +38,7 @@ export class GraphBuilder {
   /**
    * Build a complete AppGraph starting from the given entry .4gl file.
    */
-  build(entryFilePath: string, options: DiagramOptions): AppGraph {
+  build(entryFilePath: string, options: DiagramOptions, isCancelled?: () => boolean): AppGraph {
     const graph: AppGraph = {
       nodes: new Map(),
       edges: [],
@@ -57,6 +57,7 @@ export class GraphBuilder {
 
     while (queue.length > 0) {
       const item = queue.shift()!;
+      if (isCancelled?.()) { break; }
       if (visited.has(item.filePath)) { continue; }
       visited.add(item.filePath);
 
