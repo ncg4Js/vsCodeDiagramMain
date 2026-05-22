@@ -23,6 +23,10 @@ export function setProgressReporter(cb: ((message: string) => void) | undefined)
  * Writes to the "Genero App Diagram" OUTPUT channel and, when a build is
  * in progress, updates the VS Code status-bar notification message.
  */
+export function showChannel(): void {
+  _channel?.show(true);
+}
+
 export function log(message: string): void {
   _channel?.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
   _reporter?.(message);
