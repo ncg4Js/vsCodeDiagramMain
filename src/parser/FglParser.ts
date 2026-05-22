@@ -63,6 +63,7 @@ const R = {
 
   // MAIN block
   mainBlock: /^\s*MAIN\s*$/i,
+  funcMain:  /^\s*FUNCTION\s+MAIN\s*\(\s*\)(?:\s+RETURNS\s*\(\s*\))?\s*$/i,
 
   endFunction: /^\s*END\s+FUNCTION\b/i,
   endMain:     /^\s*END\s+MAIN\b/i,
@@ -283,6 +284,7 @@ export class FglParser {
         // Regular function
         const fn = R.funcDecl.exec(line);
         if (fn) {
+          if (fn[2].toUpperCase() === 'MAIN') { result.hasMain = true; }
           const frame: FunctionFrame = {
             kind: 'FUNCTION',
             name: fn[2],
@@ -294,6 +296,22 @@ export class FglParser {
             directCalls: [],
           };
           stack.push(frame);
+          continue;
+        }
+
+        // FUNCTION MAIN() without visibility modifier — also an entry point
+        if (top.kind === 'ROOT' && R.funcMain.test(line)) {
+          result.hasMain = true;
+          stack.push({
+            kind: 'FUNCTION',
+            name: 'MAIN',
+            visibility: 'PUBLIC',
+            isTypeMethod: false,
+            params: [],
+            returns: [],
+            startLine: lineNumber,
+            directCalls: [],
+          });
           continue;
         }
 

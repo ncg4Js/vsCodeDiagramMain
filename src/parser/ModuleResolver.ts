@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { SearchPaths, allSearchDirs } from '../utils/envResolver';
+import { log } from '../utils/logger';
 
 /**
  * Resolves "IMPORT FGL <path>" declarations to absolute .4gl file paths.
@@ -32,6 +33,8 @@ export class ModuleResolver {
     for (const dir of allSearchDirs(searchPaths)) {
       this.indexDirectory(dir, 0);
     }
+    const total = this.getAllKnownFiles().length;
+    log(`Module index: ${total} .4gl file${total !== 1 ? 's' : ''} indexed across all search paths`);
   }
 
   // ── Index building ────────────────────────────────────────────────────────

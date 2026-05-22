@@ -1,4 +1,5 @@
 ﻿import * as path from 'path';
+import { log } from '../utils/logger';
 import { FglParser } from './FglParser';
 import { ModuleResolver } from './ModuleResolver';
 import {
@@ -59,6 +60,7 @@ export class GraphBuilder {
       if (visited.has(item.filePath)) { continue; }
       visited.add(item.filePath);
 
+      log(`  Parsing ${path.basename(item.filePath)} (depth ${item.depth})…`);
       const parsed = this.parser.parse(item.filePath);
       this.parsedModules.set(item.filePath, parsed);
 
@@ -74,6 +76,8 @@ export class GraphBuilder {
         }
       }
     }
+
+    log(`Call graph: ${this.parsedModules.size} module${this.parsedModules.size !== 1 ? 's' : ''} parsed`);
 
     // Second pass: build edges now that all modules are parsed
     for (const [filePath, parsed] of this.parsedModules) {

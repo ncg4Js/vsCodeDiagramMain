@@ -5,8 +5,10 @@ import { ModuleResolver } from './parser/ModuleResolver';
 import { GraphBuilder } from './parser/GraphBuilder';
 import { DiagramPanel } from './diagram/webview';
 import { DiagramOptions } from './types';
+import { initLogger, setProgressReporter, log } from './utils/logger';
 
 export function activate(context: vscode.ExtensionContext): void {
+  initLogger(context);
 
   const cmd = vscode.commands.registerCommand(
     'genero-app-diagram.generate',
@@ -46,20 +48,27 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const rebuild = async (opts: DiagramOptions): Promise<void> => {
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Window, title: `Building diagram for ${entryLabel}…` },
-          async () => {
+          { location: vscode.ProgressLocation.Window, title: 'Genero App Diagram' },
+          async (progress) => {
+            setProgressReporter(msg => progress.report({ message: msg }));
             try {
-              // Pass entryDir so the resolver mirrors Genero''s own search order:
-              // current directory is always tried before FGLLDPATH and workspace folders.
+              log(`Building diagram for ${entryLabel}…`);
+              log('Resolving search paths…');
               const searchPaths = resolveSearchPaths(entryDir);
+              log('Indexing .4gl modules…');
               const resolver    = new ModuleResolver(searchPaths);
+              log('Traversing call graph…');
               const builder     = new GraphBuilder(resolver);
               const graph       = builder.build(filePath, opts);
+              log('Rendering diagram…');
               panel.updateGraph(graph);
+              log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);
             } catch (err) {
-              vscode.window.showErrorMessage(
-                `Genero Diagram: failed to build graph — ${(err as Error).message}`,
-              );
+              const errMsg = (err as Error).message;
+              log(`Error: ${errMsg}`);
+              vscode.window.showErrorMessage(`Genero Diagram: failed to build graph — ${errMsg}`);
+            } finally {
+              setProgressReporter(undefined);
             }
           },
         );
