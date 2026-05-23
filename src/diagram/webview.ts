@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AppGraph, DiagramOptions } from '../types';
 import { renderAscii } from './AsciiRenderer';
 
-const WEBVIEW_VERSION = '0.12';
+const WEBVIEW_VERSION = '0.13';
 const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
 export class DiagramPanel {

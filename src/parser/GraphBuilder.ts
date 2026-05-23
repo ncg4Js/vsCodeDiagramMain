@@ -189,6 +189,14 @@ export class GraphBuilder {
       }
     }
 
+    // Module → function edges (makes functions reachable in the tree walk)
+    for (const sig of parsed.functions) {
+      const fid = funcId(parsed.moduleName, sig.name);
+      if (graph.nodes.has(fid)) {
+        this.addEdge(graph, mid, fid, 'contains');
+      }
+    }
+
     // Build alias → moduleName map for this file
     const aliasMap = new Map<string, string>();
     for (const imp of parsed.imports) {
