@@ -1,6 +1,6 @@
 {
-  "name": "genero-app-diagram",
-  "displayName": "Genero Application Diagram",
+  "name": "module-diagram",
+  "displayName": "Module Diagram",
   "description": "Generate dependency and call-flow diagrams for Genero BDL (.4gl) applications",
   "version": "0.1.0",
   "publisher": "fourjs",
@@ -21,57 +21,57 @@
   "contributes": {
     "commands": [
       {
-        "command": "genero-app-diagram.generate",
-        "title": "Genero: Generate Application Diagram",
+        "command": "module-diagram.generate",
+        "title": "Module Diagram: Generate",
         "icon": "$(type-hierarchy)"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "genero-app-diagram.generate",
+          "command": "module-diagram.generate",
           "when": "resourceExtname == .4gl",
           "group": "navigation@99"
         }
       ],
       "editor/title": [
         {
-          "command": "genero-app-diagram.generate",
+          "command": "module-diagram.generate",
           "when": "resourceExtname == .4gl",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
-      "title": "Genero App Diagram",
+      "title": "Module Diagram",
       "properties": {
-        "generoAppDiagram.fglldpath": {
+        "moduleDiagram.fglldpath": {
           "type": "string",
           "default": "",
           "description": "Override FGLLDPATH for module search (semicolon-separated on Windows, colon-separated on Linux/Mac). Leave empty to use the environment variable."
         },
-        "generoAppDiagram.fglresourcepath": {
+        "moduleDiagram.fglresourcepath": {
           "type": "string",
           "default": "",
           "description": "Override FGLRESOURCEPATH. Leave empty to use the environment variable."
         },
-        "generoAppDiagram.maxDepth": {
+        "moduleDiagram.maxDepth": {
           "type": "number",
           "default": 2,
           "minimum": -1,
           "description": "Default diagram traversal depth. 0 = entry module only, -1 = unlimited."
         },
-        "generoAppDiagram.showPrivateFunctions": {
+        "moduleDiagram.showPrivateFunctions": {
           "type": "boolean",
           "default": true,
           "description": "Show PRIVATE functions in the diagram."
         },
-        "generoAppDiagram.showFieldEvents": {
+        "moduleDiagram.showFieldEvents": {
           "type": "boolean",
           "default": false,
           "description": "Show ON CHANGE / BEFORE FIELD / AFTER FIELD event edges."
         },
-        "generoAppDiagram.showExternalModules": {
+        "moduleDiagram.showExternalModules": {
           "type": "boolean",
           "default": false,
           "description": "Show references to modules not found in the workspace or search paths."

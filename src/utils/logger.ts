@@ -5,7 +5,7 @@ let _reporter: ((message: string) => void) | undefined;
 
 /** Initialise the output channel once during extension activation. */
 export function initLogger(context: vscode.ExtensionContext): void {
-  _channel = vscode.window.createOutputChannel('Genero App Diagram');
+  _channel = vscode.window.createOutputChannel('Module Diagram');
   context.subscriptions.push(_channel);
 }
 
@@ -20,7 +20,7 @@ export function setProgressReporter(cb: ((message: string) => void) | undefined)
 
 /**
  * Central log function used by all extension layers.
- * Writes to the "Genero App Diagram" OUTPUT channel and, when a build is
+ * Writes to the "Module Diagram" OUTPUT channel and, when a build is
  * in progress, updates the VS Code status-bar notification message.
  */
 export function showChannel(): void {

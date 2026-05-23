@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext): void {
   initLogger(context);
 
   const cmd = vscode.commands.registerCommand(
-    'genero-app-diagram.generate',
+    'module-diagram.generate',
     async (uri?: vscode.Uri) => {
 
       // Resolve the target file: from right-click URI, active editor, or user pick
@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const entryDir   = path.dirname(filePath);   // current directory — searched first
       const entryLabel = path.basename(filePath, '.4gl');
 
-      const cfg = vscode.workspace.getConfiguration('generoAppDiagram');
+      const cfg = vscode.workspace.getConfiguration('moduleDiagram');
       const options: DiagramOptions = {
         maxDepth:            cfg.get<number>('maxDepth', 2),
         showPrivate:         cfg.get<boolean>('showPrivateFunctions', true),
@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
         panel.setCancelCallback(() => { cancelFlag = true; });
         showChannel();
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: 'Genero App Diagram', cancellable: true },
+          { location: vscode.ProgressLocation.Notification, title: 'Module Diagram', cancellable: true },
           async (progress, token) => {
             token.onCancellationRequested(() => { cancelFlag = true; });
             setProgressReporter(msg => progress.report({ message: msg }));
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
             } catch (err) {
               const errMsg = (err as Error).message;
               log(`Error: ${errMsg}`);
-              vscode.window.showErrorMessage(`Genero Diagram: failed to build graph — ${errMsg}`);
+              vscode.window.showErrorMessage(`Module Diagram: failed to build graph — ${errMsg}`);
             } finally {
               setProgressReporter(undefined);
             }

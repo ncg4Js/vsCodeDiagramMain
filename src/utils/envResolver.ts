@@ -38,7 +38,7 @@ function splitVar(value: string | undefined): string[] {
  *                      Pass path.dirname(entryFilePath) from the command handler.
  */
 export function resolveSearchPaths(entryFileDir: string): SearchPaths {
-  const cfg = vscode.workspace.getConfiguration('generoAppDiagram');
+  const cfg = vscode.workspace.getConfiguration('moduleDiagram');
 
   const workspace = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
 

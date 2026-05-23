@@ -24,7 +24,7 @@ export class DiagramPanel {
     this.entryLabel = entryLabel;
     this.currentOptions = options;
     this.panel = vscode.window.createWebviewPanel(
-      'generoAppDiagram',
+      'moduleDiagram',
       `Diagram: ${entryLabel}`,
       vscode.ViewColumn.Beside,
       {
