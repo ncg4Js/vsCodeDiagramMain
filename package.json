@@ -11,6 +11,7 @@
   "bugs": {
     "url": "https://github.com/ncg4Js/vsCodeDiagramMain/issues"
   },
+  "icon": "resources/favicon_4js_full_128x.png",
   "homepage": "https://github.com/ncg4Js/vsCodeDiagramMain#readme",
   "engines": {
     "vscode": "^1.85.0"
