@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AppGraph, DiagramOptions } from '../types';
 import { renderAscii } from './AsciiRenderer';
 
-const WEBVIEW_VERSION = '0.11';
+const WEBVIEW_VERSION = '0.12';
 const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
 export class DiagramPanel {
@@ -177,7 +177,7 @@ export class DiagramPanel {
   <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents     ? 'checked' : ''}> Field events</label>
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>
-  <button id="btn-export">&#8615; Export Text</button>
+  <button id="btn-export">&#8615; Save</button>
   <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
   <span id="ver" style="font-size:10px;opacity:0.5;margin-left:6px">v${WEBVIEW_VERSION}</span>
