@@ -69,6 +69,10 @@ export function activate(context: vscode.ExtensionContext): void {
               log('Traversing call graph...');                await tick();
               const builder     = new GraphBuilder(resolver);
               const graph       = builder.build(filePath, opts, () => cancelFlag);
+              if (!graph.nodes.has('ENTRY_MAIN')) {
+                vscode.window.showErrorMessage('No main entry point in this file');
+                return;
+              }
               log('Rendering diagram...');                    await tick();
               panel.updateGraph(graph);
               log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);

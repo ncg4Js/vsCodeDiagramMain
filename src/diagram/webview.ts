@@ -1,10 +1,9 @@
 ﻿import * as vscode from 'vscode';
 import * as path from 'path';
 import { AppGraph, DiagramOptions } from '../types';
-import { renderMermaid } from './MermaidRenderer';
+import { renderAscii } from './AsciiRenderer';
 
-const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
-const WEBVIEW_VERSION = '0.09';
+const WEBVIEW_VERSION = '0.11';
 const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
 export class DiagramPanel {
@@ -53,7 +52,7 @@ export class DiagramPanel {
           this.onRefreshRequest?.(this.currentOptions);
           break;
         case 'export':
-          this.exportDiagram(msg.svg as string);
+          this.exportDiagram(msg.data as string);
           break;
         case 'cancel':
           this.onCancelRequest?.();
@@ -84,10 +83,10 @@ export class DiagramPanel {
   }
 
   updateGraph(graph: AppGraph): void {
-    const { mermaid, nodeCount, edgeCount } = renderMermaid(graph, this.currentOptions);
+    const { ascii, nodeCount, edgeCount } = renderAscii(graph);
     this.panel.webview.postMessage({
       type:    'update',
-      diagram: mermaid,
+      diagram: ascii,
       stats:   `${nodeCount} nodes · ${edgeCount} edges`,
     });
   }
@@ -102,43 +101,26 @@ export class DiagramPanel {
     });
   }
 
-  private async exportDiagram(svgData: string): Promise<void> {
-    if (!svgData) {
-      vscode.window.showWarningMessage('No diagram rendered yet.');
+  private async exportDiagram(asciiData: string): Promise<void> {
+    if (!asciiData) {
+      vscode.window.showWarningMessage('No diagram generated yet.');
       return;
     }
     const lastFolder = this.context.globalState.get<string>(LAST_FOLDER_KEY);
     const safeName   = this.entryLabel.replace(/\W+/g, '_');
     const timestamp  = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
     const suggested  = lastFolder
-      ? vscode.Uri.file(path.join(lastFolder, `${safeName}_${timestamp}.html`))
-      : vscode.Uri.file(`${safeName}_${timestamp}.html`);
+      ? vscode.Uri.file(path.join(lastFolder, `${safeName}_${timestamp}.txt`))
+      : vscode.Uri.file(`${safeName}_${timestamp}.txt`);
 
     const uri = await vscode.window.showSaveDialog({
       defaultUri: suggested,
-      filters:    { 'HTML files': ['html'] },
+      filters:    { 'Text files': ['txt'] },
     });
     if (!uri) { return; }
     await this.context.globalState.update(LAST_FOLDER_KEY, path.dirname(uri.fsPath));
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>${this.entryLabel} Diagram</title>
-<style>
-  body { margin: 0; padding: 16px; background: #1e1e1e;
-         display: flex; justify-content: center; align-items: flex-start; }
-  svg  { max-width: 100%; height: auto; }
-</style>
-</head>
-<body>
-${svgData}
-</body>
-</html>`;
-
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(html));
-    await vscode.env.openExternal(uri);
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(asciiData));
+    vscode.window.showInformationMessage(`Diagram saved to ${uri.fsPath}`);
   }
 
   private buildHtml(): string {
@@ -151,9 +133,8 @@ ${svgData}
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none';
-           script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
-           style-src  'nonce-${nonce}';
-           img-src    data:;">
+           script-src 'nonce-${nonce}';
+           style-src  'nonce-${nonce}';">
 <style nonce="${nonce}">
   :root { color-scheme: dark light; }
   body  { margin:0; padding:0; background:var(--vscode-editor-background);
@@ -192,11 +173,11 @@ ${svgData}
       <option value="-1" ${opts.maxDepth === -1 ? 'selected' : ''}>Unlimited</option>
     </select>
   </label>
-  <label><input type="checkbox" id="chk-private"  ${opts.showPrivate       ? 'checked' : ''}> PRIVATE functions</label>
-  <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents   ? 'checked' : ''}> Field events</label>
+  <label><input type="checkbox" id="chk-private"  ${opts.showPrivate         ? 'checked' : ''}> PRIVATE functions</label>
+  <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents     ? 'checked' : ''}> Field events</label>
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>
-  <button id="btn-export">&#8615; Export Diagram</button>
+  <button id="btn-export">&#8615; Export Text</button>
   <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
   <span id="ver" style="font-size:10px;opacity:0.5;margin-left:6px">v${WEBVIEW_VERSION}</span>
@@ -205,25 +186,10 @@ ${svgData}
   <div id="loading">Generating diagram…</div>
   <pre id="diagram-text" style="display:none"></pre>
 </div>
-<div id="diagram-render" class="mermaid" style="position:absolute;left:-9999px;top:0;width:800px"></div>
 
-<script nonce="${nonce}" src="${MERMAID_CDN}"></script>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-let mermaidSource = '';
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: document.body.classList.contains('vscode-light') ? 'default' : 'dark',
-  flowchart: { useMaxWidth: false, htmlLabels: false },
-  securityLevel: 'loose',
-  maxTextSize: 500000,
-  maxEdges: 1000,
-});
-
-window.navigateTo = function(filePath, lineNumber) {
-  vscode.postMessage({ type: 'navigate', filePath, lineNumber: parseInt(lineNumber, 10) || 1 });
-};
+let diagramText = '';
 
 document.getElementById('btn-refresh').addEventListener('click', () => {
   vscode.postMessage({
@@ -235,38 +201,24 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   });
 });
 
-document.getElementById('btn-export').addEventListener('click', () => renderAndExport());
-
-async function renderAndExport() {
-  if (!mermaidSource) { return; }
-  const renderEl = document.getElementById('diagram-render');
-  try {
-    renderEl.removeAttribute('data-processed');
-    renderEl.textContent = mermaidSource;
-    await mermaid.run({ querySelector: '#diagram-render' });
-    const svgEl = renderEl.querySelector('svg');
-    const svg   = svgEl ? new XMLSerializer().serializeToString(svgEl) : '';
-    vscode.postMessage({ type: 'export', svg });
-  } catch (err) {
-    vscode.postMessage({ type: 'export', svg: '' });
-  }
-}
+document.getElementById('btn-export').addEventListener('click', () => {
+  if (diagramText) { vscode.postMessage({ type: 'export', data: diagramText }); }
+});
 
 document.getElementById('btn-cancel').addEventListener('click', () => {
   vscode.postMessage({ type: 'cancel' });
 });
 
-window.addEventListener('message', async event => {
+window.addEventListener('message', event => {
   const msg = event.data;
   if (msg.type === 'update') {
-    mermaidSource = msg.diagram ?? '';
+    diagramText = msg.diagram ?? '';
     document.getElementById('stats').textContent = msg.stats ?? '';
     const textEl  = document.getElementById('diagram-text');
     const loading = document.getElementById('loading');
-    textEl.textContent    = mermaidSource;
-    textEl.style.display  = mermaidSource ? '' : 'none';
-    loading.style.display = mermaidSource ? 'none' : '';
-    if (mermaidSource) { await renderAndExport(); }
+    textEl.textContent    = diagramText;
+    textEl.style.display  = diagramText ? '' : 'none';
+    loading.style.display = diagramText ? 'none' : '';
   }
 });
 </script>
