@@ -2,7 +2,7 @@
   "name": "genero-bdl-diagram",
   "displayName": "Genero BDL Diagram",
   "description": "Generate dependency and call-flow diagrams for Genero BDL (.4gl) applications",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "fourjs",
   "repository": {
     "type": "git",
@@ -16,7 +16,10 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Visualization", "Other"],
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -84,11 +87,14 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "docs": "typedoc",
+    "package": "npx vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "typedoc": "^0.28.19",
     "typescript": "^5.3.0"
   }
 }

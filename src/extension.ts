@@ -8,6 +8,14 @@ import { DiagramPanel } from './diagram/webview';
 import { DiagramOptions } from './types';
 import { initLogger, setProgressReporter, log, showChannel } from './utils/logger';
 
+/**
+ * Heuristic check that a file actually contains Genero BDL source code.
+ * Reads the first 64 KB and tests for characteristic keywords, so the
+ * extension does not accidentally try to diagram binary or unrelated text files.
+ *
+ * @param filePath  Absolute path to the file to inspect.
+ * @returns         `true` when the file looks like a `.4gl` source file.
+ */
 function looksLike4glSource(filePath: string): boolean {
   try {
     const buf = fs.readFileSync(filePath);
@@ -18,6 +26,18 @@ function looksLike4glSource(filePath: string): boolean {
   }
 }
 
+/**
+ * VS Code extension activation entry point.
+ *
+ * Registers the `module-diagram.generate` command, which:
+ *   1. Resolves the target `.4gl` file (from right-click URI, active editor, or file picker).
+ *   2. Validates that the file is a Genero BDL source.
+ *   3. Reads diagram options from the `moduleDiagram.*` workspace settings.
+ *   4. Opens (or reuses) the {@link DiagramPanel} webview.
+ *   5. Builds the call graph and pushes the result to the webview.
+ *
+ * @param context  Extension context provided by VS Code.
+ */
 export function activate(context: vscode.ExtensionContext): void {
   initLogger(context);
 
@@ -70,6 +90,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
       const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 
+      /**
+       * Full rebuild pipeline: resolve paths → index modules → build graph → render.
+       * Called on first open and whenever the user clicks Refresh in the webview.
+       *
+       * @param opts  Diagram options (may differ from initial `options` after a Refresh).
+       */
       const rebuild = async (opts: DiagramOptions): Promise<void> => {
         cancelFlag = false;
         panel.setCancelCallback(() => { cancelFlag = true; });
@@ -117,4 +143,5 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(cmd);
 }
 
+/** VS Code extension deactivation hook. No explicit cleanup required. */
 export function deactivate(): void {}

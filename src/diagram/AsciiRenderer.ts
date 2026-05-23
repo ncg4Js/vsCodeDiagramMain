@@ -1,11 +1,21 @@
 import { AppGraph, GraphNode, NodeType } from '../types';
 
+/** Result produced by {@link renderAscii}. */
 export interface AsciiResult {
+  /** The complete ASCII tree as a single multi-line string. */
   ascii:     string;
+  /** Total number of nodes in the graph. */
   nodeCount: number;
+  /** Total number of edges in the graph. */
   edgeCount: number;
 }
 
+/**
+ * Return the Unicode symbol used to represent a node type in the ASCII tree.
+ *
+ * @param type  Node type from the graph model.
+ * @returns     Single Unicode character.
+ */
 function sym(type: NodeType): string {
   switch (type) {
     case 'entry':                                          return '◆';
@@ -18,14 +28,30 @@ function sym(type: NodeType): string {
   }
 }
 
+/**
+ * Format the file location suffix appended to each node label.
+ *
+ * @param node  Graph node that may carry a file path and line number.
+ * @returns     `"  [file.4gl:42]"` string, or empty string if no path is set.
+ */
 function loc(node: GraphNode): string {
   if (!node.filePath) { return ''; }
   const file = node.filePath.replace(/\\/g, '/').split('/').pop() ?? '';
   return node.lineNumber ? `  [${file}:${node.lineNumber}]` : `  [${file}]`;
 }
 
+/**
+ * Render an {@link AppGraph} as a recursive ASCII tree.
+ *
+ * The tree is rooted at the `entry` node (if present) or the entry module node
+ * (for libraries without a `MAIN` block). Already-visited nodes are marked with
+ * `↺` to break cycles without omitting them entirely.
+ *
+ * @param graph  Application graph produced by {@link GraphBuilder.build}.
+ * @returns      {@link AsciiResult} with the rendered text and graph statistics.
+ */
 export function renderAscii(graph: AppGraph): AsciiResult {
-  // Build outgoing adjacency (deduped)
+  // Build outgoing adjacency list (deduped)
   const out = new Map<string, string[]>();
   for (const edge of graph.edges) {
     if (!graph.nodes.has(edge.from) || !graph.nodes.has(edge.to)) { continue; }
@@ -37,6 +63,13 @@ export function renderAscii(graph: AppGraph): AsciiResult {
   const lines: string[] = [];
   const visited = new Set<string>();
 
+  /**
+   * Recursively render a subtree rooted at `nodeId`.
+   *
+   * @param nodeId   ID of the node to render.
+   * @param prefix   Indentation prefix accumulated by the parent call.
+   * @param isLast   Whether this node is the last child of its parent.
+   */
   function walk(nodeId: string, prefix: string, isLast: boolean): void {
     const node = graph.nodes.get(nodeId);
     if (!node) { return; }

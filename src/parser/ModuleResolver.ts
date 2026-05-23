@@ -4,20 +4,20 @@ import { SearchPaths, allSearchDirs } from '../utils/envResolver';
 import { log } from '../utils/logger';
 
 /**
- * Resolves "IMPORT FGL <path>" declarations to absolute .4gl file paths.
+ * Resolves `IMPORT FGL <path>` declarations to absolute `.4gl` file paths.
  *
  * Module name matching is case-insensitive at the language level (Genero
  * identifiers are case-insensitive outside of resource/style names). The
- * resolver prefers the entry file''s own directory over all other locations,
- * mirroring Genero''s own runtime resolution order.
+ * resolver prefers the entry file's own directory over all other locations,
+ * mirroring Genero's own runtime resolution order.
  *
  * Search order:
- *   1. Directory of the entry .4gl file (current directory)
+ *   1. Directory of the entry `.4gl` file (current directory)
  *   2. VS Code workspace folders (recursive)
- *   3. FGLLDPATH entries
- *   4. FGLRESOURCEPATH entries
- *   5. DBPATH entries
- *   6. PATH entries
+ *   3. `FGLLDPATH` entries
+ *   4. `FGLRESOURCEPATH` entries
+ *   5. `DBPATH` entries
+ *   6. `PATH` entries
  */
 export class ModuleResolver {
   /**
@@ -26,9 +26,14 @@ export class ModuleResolver {
    */
   private readonly index = new Map<string, string[]>();
 
-  /** Resolution cache: rawImportPath → resolved absolute path (or null). */
+  /** Resolution cache: rawImportPath → resolved absolute path (or `null`). */
   private readonly cache = new Map<string, string | null>();
 
+  /**
+   * Build the module index by scanning all directories in `searchPaths`.
+   *
+   * @param searchPaths  Ordered search-path collection from {@link resolveSearchPaths}.
+   */
   constructor(private readonly searchPaths: SearchPaths) {
     for (const dir of allSearchDirs(searchPaths)) {
       this.indexDirectory(dir, 0);
@@ -39,8 +44,14 @@ export class ModuleResolver {
 
   // ── Index building ────────────────────────────────────────────────────────
 
+  /**
+   * Recursively walk `dir` and register every `.4gl` file found in the index.
+   * Depth is capped at 8 to avoid runaway traversal of large PATH entries.
+   *
+   * @param dir    Directory to scan.
+   * @param depth  Current recursion depth (starts at 0).
+   */
   private indexDirectory(dir: string, depth: number): void {
-    // Guard against deep trees (e.g. node_modules inside PATH entries)
     if (depth > 8) { return; }
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -52,7 +63,6 @@ export class ModuleResolver {
           const full = path.join(dir, entry.name);
           const key = stem.toLowerCase();
           const list = this.index.get(key) ?? [];
-          // Avoid duplicates (same file via different path representations)
           if (!list.includes(full)) { list.push(full); }
           this.index.set(key, list);
         }
@@ -67,10 +77,10 @@ export class ModuleResolver {
   /**
    * Resolve an import path to an absolute file path.
    *
-   * @param importPath  The raw string from "IMPORT FGL <importPath>".
-   *                    May be a simple name ("RegisterController") or a
-   *                    package path ("com.myapp.core.RegisterController").
-   * @returns Absolute path to the .4gl file, or null if not found.
+   * @param importPath  The raw string from `IMPORT FGL <importPath>`.
+   *                    May be a simple name (`"RegisterController"`) or a
+   *                    package path (`"com.myapp.core.RegisterController"`).
+   * @returns Absolute path to the `.4gl` file, or `null` if not found.
    */
   resolve(importPath: string): string | null {
     if (this.cache.has(importPath)) {
@@ -81,13 +91,19 @@ export class ModuleResolver {
     return result;
   }
 
+  /**
+   * Internal resolution logic — not cached. Tries hierarchical path lookup
+   * first (strategy A), then falls back to the flat index (strategy B).
+   *
+   * @param importPath  Raw import path string.
+   * @returns Resolved absolute path, or `null`.
+   */
   private doResolve(importPath: string): string | null {
     const segments = importPath.split('.');
     const moduleNameRaw = segments[segments.length - 1];
     const moduleNameLower = moduleNameRaw.toLowerCase();
 
     // Strategy A: hierarchical package path (com/myapp/core/ModuleName.4gl)
-    // Searched across all dirs in priority order, so currentDir is tried first.
     if (segments.length > 1) {
       const relParts = [...segments.slice(0, -1), moduleNameRaw + '.4gl'];
       const relPath = path.join(...relParts);
@@ -98,19 +114,18 @@ export class ModuleResolver {
     }
 
     // Strategy B: flat lookup via the pre-built index (case-insensitive primary).
-    // Index was built in allSearchDirs priority order, so currentDir entries
-    // appear first in each candidate list.
     const candidates = this.index.get(moduleNameLower);
     if (!candidates || candidates.length === 0) { return null; }
 
-    // Prefer exact-case match on case-sensitive filesystems
     const exact = candidates.find(p => path.basename(p, '.4gl') === moduleNameRaw);
     return exact ?? candidates[0];
   }
 
   /**
-   * Return all .4gl file paths discovered across all search directories.
+   * Return all `.4gl` file paths discovered across all search directories.
    * Useful for listing all known project modules.
+   *
+   * @returns Deduplicated array of absolute file paths.
    */
   getAllKnownFiles(): string[] {
     const seen = new Set<string>();
@@ -123,7 +138,12 @@ export class ModuleResolver {
     return result;
   }
 
-  /** Extract the plain module name (file stem) from a raw import path. */
+  /**
+   * Extract the plain module name (file stem) from a raw import path.
+   *
+   * @param importPath  Full dotted import path, e.g. `"com.myapp.Module"`.
+   * @returns           The last segment, e.g. `"Module"`.
+   */
   static moduleNameFrom(importPath: string): string {
     const segs = importPath.split('.');
     return segs[segs.length - 1];

@@ -1,4 +1,4 @@
-﻿import * as path from 'path';
+import * as path from 'path';
 import { log } from '../utils/logger';
 import { FglParser } from './FglParser';
 import { ModuleResolver } from './ModuleResolver';
@@ -9,34 +9,79 @@ import {
 
 // ─── ID helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Sanitise a string for use as a Mermaid node ID.
+ *
+ * @param s  Raw string (module name, function name, etc.).
+ * @returns  String with only alphanumeric characters and underscores.
+ */
 function safeId(s: string): string {
-  // Mermaid node IDs: alphanumeric + underscore only
   return s.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
+/**
+ * Build the stable node ID for a module node.
+ *
+ * @param moduleName  Module stem (file name without `.4gl`).
+ * @returns           Prefixed ID string, e.g. `"M_RegisterController"`.
+ */
 function moduleId(moduleName: string): string {
   return `M_${safeId(moduleName)}`;
 }
 
+/**
+ * Build the stable node ID for a function node.
+ *
+ * @param moduleName  Module stem.
+ * @param funcName    Function name as declared in source.
+ * @returns           Prefixed ID string, e.g. `"F_RegisterController_regLoop"`.
+ */
 function funcId(moduleName: string, funcName: string): string {
   return `F_${safeId(moduleName)}_${safeId(funcName)}`;
 }
 
+/**
+ * Build the stable node ID for a dialog block node.
+ *
+ * @param moduleName  Module stem.
+ * @param funcName    Containing function name.
+ * @param dialogType  Dialog type keyword (`"INPUT"`, `"MENU"`, etc.).
+ * @param idx         1-based occurrence counter within the function (for multiple dialogs).
+ * @returns           Prefixed ID string.
+ */
 function dialogId(moduleName: string, funcName: string, dialogType: string, idx: number): string {
   return `D_${safeId(moduleName)}_${safeId(funcName)}_${safeId(dialogType)}_${idx}`;
 }
 
 // ─── GraphBuilder ──────────────────────────────────────────────────────────
 
+/**
+ * Builds an {@link AppGraph} by parsing the entry `.4gl` file and all modules
+ * reachable via `IMPORT FGL` declarations, up to the configured depth.
+ *
+ * The build is a two-pass process:
+ *   1. **BFS traversal** — parse each module in breadth-first order, create all nodes.
+ *   2. **Edge pass** — once every reachable module is parsed, resolve all call references
+ *      and create edges between nodes.
+ */
 export class GraphBuilder {
   private parser = new FglParser();
   private parsedModules = new Map<string, ParsedModule>(); // filePath → parsed
   private dialogCounters = new Map<string, number>();      // funcId → counter
 
+  /**
+   * @param resolver  {@link ModuleResolver} used to locate imported `.4gl` files.
+   */
   constructor(private resolver: ModuleResolver) {}
 
   /**
-   * Build a complete AppGraph starting from the given entry .4gl file.
+   * Build a complete {@link AppGraph} starting from the given entry `.4gl` file.
+   *
+   * @param entryFilePath  Absolute path to the entry (MAIN) source file.
+   * @param options        Diagram options controlling depth, visibility, etc.
+   * @param isCancelled    Optional cancellation probe — polling returns `true` when
+   *                       the user has clicked Cancel in the progress notification.
+   * @returns              Fully populated {@link AppGraph}.
    */
   build(entryFilePath: string, options: DiagramOptions, isCancelled?: () => boolean): AppGraph {
     const graph: AppGraph = {
@@ -90,6 +135,18 @@ export class GraphBuilder {
 
   // ── Node construction ───────────────────────────────────────────────────
 
+  /**
+   * Create all graph nodes for a single parsed module:
+   *   - One module node.
+   *   - An `ENTRY_MAIN` entry node for the top-level file (if it has a `MAIN` block).
+   *   - One function node per public (and optionally private) function.
+   *   - One dialog node per unique `MENU`/`INPUT`/`CONSTRUCT`/`DISPLAY ARRAY`/`DIALOG` block.
+   *
+   * @param graph    Graph being constructed.
+   * @param parsed   Parse result for the module.
+   * @param isEntry  `true` when this is the entry file passed to {@link build}.
+   * @param options  Diagram options.
+   */
   private addModuleNodes(
     graph: AppGraph,
     parsed: ParsedModule,
@@ -166,6 +223,17 @@ export class GraphBuilder {
 
   // ── Edge construction ───────────────────────────────────────────────────
 
+  /**
+   * Create all graph edges for a single parsed module:
+   *   - Import edges (module → imported module or external stub).
+   *   - Contains edges (module → each of its function nodes).
+   *   - Calls edges (function → functions it calls directly).
+   *   - Dialog/access-point edges (function → dialog node → triggered functions).
+   *
+   * @param graph    Graph being constructed (all module nodes already added).
+   * @param parsed   Parse result for the module.
+   * @param options  Diagram options.
+   */
   private addModuleEdges(graph: AppGraph, parsed: ParsedModule, options: DiagramOptions): void {
     const mid = moduleId(parsed.moduleName);
 
@@ -253,6 +321,26 @@ export class GraphBuilder {
     }
   }
 
+  /**
+   * Resolve a single {@link CallRef} to a target graph node and create an edge.
+   *
+   * Handles three call patterns:
+   *   - `localFunction()` — same-module lookup.
+   *   - `Module.function()` — cross-module lookup via alias or direct module name.
+   *   - `Module.variable.method()` — type-method call with intermediate variable.
+   *
+   * If the target node is not present in the graph (e.g. depth-limited or
+   * unresolvable), the edge is silently omitted.
+   *
+   * @param graph      Graph being constructed.
+   * @param fromId     Source node ID.
+   * @param call       Call reference to resolve.
+   * @param parsed     Parse result for the module containing the call.
+   * @param aliasMap   Maps lower-case import alias/name → canonical module name.
+   * @param options    Diagram options.
+   * @param edgeType   `'calls'` or `'triggers'`.
+   * @param edgeLabel  Optional label to attach to the edge.
+   */
   private resolveCallEdge(
     graph: AppGraph,
     fromId: string,
@@ -267,7 +355,6 @@ export class GraphBuilder {
     let targetFuncName = call.functionName;
 
     if (call.qualifier) {
-      // Resolve qualifier: could be an alias or a direct module name
       targetModuleName =
         aliasMap.get(call.qualifier.toLowerCase()) ?? call.qualifier;
     }
@@ -276,7 +363,6 @@ export class GraphBuilder {
       // Cross-module call
       const targetFid = funcId(targetModuleName, targetFuncName);
       const targetMid = moduleId(targetModuleName);
-      // Only draw edge if the target module is in the graph
       if (graph.nodes.has(targetFid)) {
         this.addEdge(graph, fromId, targetFid, edgeType, edgeLabel);
       } else if (graph.nodes.has(targetMid) && options.showExternalModules) {
@@ -293,6 +379,15 @@ export class GraphBuilder {
 
   // ── Utilities ───────────────────────────────────────────────────────────
 
+  /**
+   * Add a directed edge to the graph, silently ignoring self-loops and duplicates.
+   *
+   * @param graph  Graph being constructed.
+   * @param from   Source node ID.
+   * @param to     Target node ID.
+   * @param type   Semantic edge type.
+   * @param label  Optional display label.
+   */
   private addEdge(
     graph: AppGraph,
     from: string,
@@ -300,7 +395,6 @@ export class GraphBuilder {
     type: GraphEdge['type'],
     label?: string,
   ): void {
-    // Avoid duplicate edges
     const exists = graph.edges.some(
       e => e.from === from && e.to === to && e.type === type && e.label === label,
     );
@@ -309,6 +403,13 @@ export class GraphBuilder {
     }
   }
 
+  /**
+   * Format the display label for a function node, including visibility prefix,
+   * parameter names/types, and return types.
+   *
+   * @param sig  Parsed function signature.
+   * @returns    Label string, e.g. `"+ regLoop() → BOOLEAN"`.
+   */
   private formatFuncLabel(sig: FunctionSignature): string {
     const vis = sig.visibility === 'PUBLIC' ? '+' : '-';
     const params = sig.params.map(p => `${p.name}: ${p.type}`).join(', ');
@@ -317,6 +418,12 @@ export class GraphBuilder {
     return `${vis} ${typePrefix}${sig.name}(${params})${ret}`;
   }
 
+  /**
+   * Format the edge label for an access-point handler.
+   *
+   * @param ap  Access point whose type and name determine the label.
+   * @returns   Short label string, e.g. `"action: accept"` or `"after: qty"`.
+   */
   private formatApLabel(ap: AccessPoint): string {
     switch (ap.apType) {
       case 'ON_ACTION':     return `action: ${ap.name}`;
@@ -334,10 +441,21 @@ export class GraphBuilder {
     }
   }
 
+  /**
+   * Return `true` when the access point is a field-level event that should be
+   * hidden when `options.showFieldEvents` is `false`.
+   *
+   * @param ap  Access point to test.
+   */
   private isFieldEvent(ap: AccessPoint): boolean {
     return ['ON_CHANGE', 'BEFORE_FIELD', 'AFTER_FIELD', 'BEFORE_ROW', 'AFTER_ROW'].includes(ap.apType);
   }
 
+  /**
+   * Return `true` when the node type represents a dialog block (not a handler).
+   *
+   * @param type  Node type to test.
+   */
   private isDialogNodeType(type: NodeType): boolean {
     return ['menu', 'input', 'construct', 'display_array', 'dialog'].includes(type);
   }

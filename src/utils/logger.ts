@@ -11,22 +11,26 @@ export function initLogger(context: vscode.ExtensionContext): void {
 
 /**
  * Register (or clear) the function that forwards log messages to the current
- * withProgress reporter so the status-bar notification text stays in sync.
- * Call setProgressReporter(undefined) in the finally block after each build.
+ * `withProgress` reporter, keeping the status-bar notification text in sync.
+ * Call `setProgressReporter(undefined)` in the `finally` block after each build.
+ *
+ * @param cb  Reporter callback, or `undefined` to detach.
  */
 export function setProgressReporter(cb: ((message: string) => void) | undefined): void {
   _reporter = cb;
 }
 
-/**
- * Central log function used by all extension layers.
- * Writes to the "Genero BDL Diagram" OUTPUT channel and, when a build is
- * in progress, updates the VS Code status-bar notification message.
- */
+/** Reveal the "Genero BDL Diagram" output channel without stealing focus. */
 export function showChannel(): void {
   _channel?.show(true);
 }
 
+/**
+ * Append a timestamped message to the output channel and, when a build is in
+ * progress, forward it to the VS Code status-bar notification.
+ *
+ * @param message  Plain-text message to log.
+ */
 export function log(message: string): void {
   _channel?.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
   _reporter?.(message);

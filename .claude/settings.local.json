@@ -15,7 +15,19 @@
       "Bash(code --command workbench.action.reloadWindow)",
       "Bash(code --install-extension \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\module-diagram-0.1.0.vsix\" --force)",
       "Bash(dir \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\resources\")",
-      "Bash(dir \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\" /b)"
+      "Bash(dir \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\" /b)",
+      "Bash(npm run *)",
+      "PowerShell(npx vsce package --no-dependencies 2>&1)",
+      "PowerShell(code --install-extension module-diagram-0.1.0.vsix --force 2>&1)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" status)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" log --oneline -3)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" diff src/diagram/webview.ts src/parser/GraphBuilder.ts)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" add src/diagram/webview.ts src/parser/GraphBuilder.ts)",
+      "Bash(git -C c:/work/VsCode/vs_code_app_diagram commit -m ' *)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" push)",
+      "PowerShell(npm run compile 2>&1)",
+      "PowerShell(git add src/diagram/AsciiRenderer.ts src/diagram/webview.ts)",
+      "PowerShell(code --install-extension genero-bdl-diagram-0.1.0.vsix --force 2>&1)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ncgod\\.claude"

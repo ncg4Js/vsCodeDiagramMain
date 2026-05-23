@@ -1,0 +1,11 @@
+{
+  "entryPoints": ["src"],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "name": "Genero BDL Diagram",
+  "readme": "none",
+  "tsconfig": "./tsconfig.json",
+  "excludePrivate": false,
+  "excludeExternals": true,
+  "skipErrorChecking": true
+}

@@ -1,4 +1,4 @@
-﻿import * as fs from 'fs';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
   ParsedModule, ImportDef, FunctionSignature, AccessPoint, CallRef,
@@ -7,6 +7,7 @@ import {
 
 // ─── Context stack frames ──────────────────────────────────────────────────
 
+/** Discriminant union of all possible parser context kinds. */
 type ContextKind =
   | 'ROOT'
   | 'FUNCTION'
@@ -17,7 +18,10 @@ type ContextKind =
   | 'DIALOG'
   | 'HANDLER';
 
+/** Top-level module scope — no enclosing construct. */
 interface RootFrame    { kind: 'ROOT' }
+
+/** Active `FUNCTION` or `MAIN` block being parsed. */
 interface FunctionFrame {
   kind: 'FUNCTION';
   name: string;
@@ -27,14 +31,18 @@ interface FunctionFrame {
   params: ParamDef[];
   returns: string[];
   startLine: number;
-  /** Direct CALL refs in the function body (outside any handler) */
+  /** Direct `CALL` refs in the function body (outside any access-point handler). */
   directCalls: CallRef[];
 }
+
+/** Active dialog block (`MENU`, `INPUT`, `CONSTRUCT`, `DISPLAY ARRAY`, `DIALOG`). */
 interface DialogFrame {
   kind: 'MENU' | 'INPUT' | 'CONSTRUCT' | 'DISPLAY_ARRAY' | 'DIALOG';
   title?: string;
   lineNumber: number;
 }
+
+/** Active access-point handler (`ON ACTION`, `BEFORE INPUT`, `AFTER FIELD`, etc.). */
 interface HandlerFrame {
   kind: 'HANDLER';
   apType: AccessPointType;
@@ -54,8 +62,6 @@ const R = {
   importFgl: /^\s*IMPORT\s+FGL\s+([\w.]+)(?:\s+AS\s+(\w+))?\s*$/i,
 
   // PUBLIC|PRIVATE FUNCTION name(params) RETURNS(types)
-  // e.g.  PUBLIC FUNCTION regLoop() RETURNS()
-  //       PRIVATE FUNCTION inputReg(mode CHAR(1)) RETURNS(BOOLEAN)
   funcDecl: /^\s*(PUBLIC|PRIVATE)\s+FUNCTION\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   // Type-method: PUBLIC FUNCTION (self TTypeName) methodName(params) RETURNS(types)
@@ -63,7 +69,7 @@ const R = {
 
   // MAIN block
   mainBlock:    /^\s*MAIN\s*$/i,
-  // Bare FUNCTION (no PUBLIC/PRIVATE) — treated as PUBLIC; superset of funcMain
+  // Bare FUNCTION (no PUBLIC/PRIVATE) — treated as PUBLIC
   funcDeclBare: /^\s*FUNCTION\s+(\w+)\s*\((.*?)\)(?:\s+RETURNS\s*\((.*?)\))?\s*$/i,
 
   endFunction: /^\s*END\s+FUNCTION\b/i,
@@ -97,7 +103,6 @@ const R = {
   onCrud:         /^\s*ON\s+(UPDATE|INSERT|APPEND|DELETE)\b/i,
 
   // CALL statement (handles RETURNING clause)
-  // Captures: qualifier (optional), intermediate (optional), functionName
   callStmt: /^\s*CALL\s+((?:(\w+)\.)?((?:\w+\.)*)(\w+))\s*\(/i,
 
   // FUNCTION keyword used as value (not a call)
@@ -110,6 +115,15 @@ const R = {
 
 // ─── Helper functions ──────────────────────────────────────────────────────
 
+/**
+ * Strip line and block comments from a single source line, preserving string
+ * literal contents so comment markers inside strings are not mistakenly removed.
+ *
+ * @param line            The raw source line to process.
+ * @param inBlockComment  Whether a `{ ... }` block comment was open at the start
+ *                        of this line (carry-over from the previous line).
+ * @returns               A tuple of `[stripped line, newBlockCommentState]`.
+ */
 function stripComments(line: string, inBlockComment: boolean): [string, boolean] {
   let result = '';
   let i = 0;
@@ -142,6 +156,12 @@ function stripComments(line: string, inBlockComment: boolean): [string, boolean]
   return [result.trimEnd(), inBlock];
 }
 
+/**
+ * Parse a raw parameter-list string into an array of `{name, type}` pairs.
+ *
+ * @param raw  Content between the parentheses of a `FUNCTION` declaration.
+ * @returns    Array of {@link ParamDef} objects (empty if the parameter list is empty).
+ */
 function parseParams(raw: string): ParamDef[] {
   if (!raw.trim()) { return []; }
   return raw.split(',').map(p => {
@@ -153,21 +173,39 @@ function parseParams(raw: string): ParamDef[] {
   });
 }
 
+/**
+ * Parse a raw return-type string into an array of type name strings.
+ *
+ * @param raw  Content between the parentheses of a `RETURNS(...)` clause.
+ * @returns    Array of trimmed type strings (empty if the function returns nothing).
+ */
 function parseReturns(raw: string): string[] {
   if (!raw.trim()) { return []; }
   return raw.split(',').map(r => r.trim()).filter(r => r.length > 0);
 }
 
 /**
- * Split a comma-separated field list, trimming each name.
- * Used for ON CHANGE / BEFORE FIELD / AFTER FIELD which can list multiple fields.
+ * Split a comma-separated field list and trim each name.
+ * Used for `ON CHANGE` / `BEFORE FIELD` / `AFTER FIELD` which can list multiple fields.
+ *
+ * @param raw  Raw comma-separated field-name list.
+ * @returns    Array of trimmed, non-empty field name strings.
  */
 function splitFields(raw: string): string[] {
   return raw.split(',').map(f => f.trim()).filter(f => f.length > 0);
 }
 
-// Extract CALL refs from a single (comment-stripped) line.
-// Returns all found calls; sets isFunctionRef=true for FUNCTION keyword refs.
+/**
+ * Extract all function call references from a single comment-stripped source line.
+ *
+ * Detects both:
+ *   - `CALL [Module.]function(` — a real invocation.
+ *   - `FUNCTION name` — a function-reference value (not a call).
+ *
+ * @param line        Comment-stripped source line.
+ * @param lineNumber  1-based line number (stored in each returned {@link CallRef}).
+ * @returns           Array of {@link CallRef} objects found on the line.
+ */
 function extractCallsFromLine(line: string, lineNumber: number): CallRef[] {
   const refs: CallRef[] = [];
 
@@ -177,7 +215,6 @@ function extractCallsFromLine(line: string, lineNumber: number): CallRef[] {
   const funcRefRe = /\bFUNCTION\s+(\w+)/gi;
   while ((fmatch = funcRefRe.exec(line)) !== null) {
     refs.push({ functionName: fmatch[1], isFunctionRef: true, lineNumber });
-    // Mark the position where the function name starts
     funcRefPositions.add(fmatch.index);
   }
 
@@ -185,7 +222,6 @@ function extractCallsFromLine(line: string, lineNumber: number): CallRef[] {
   const callRe = /\bCALL\s+((\w+)(?:\.(\w+))?(?:\.(\w+))?)\s*\(/gi;
   let cmatch: RegExpExecArray | null;
   while ((cmatch = callRe.exec(line)) !== null) {
-    // cmatch[2] = first segment, cmatch[3] = second, cmatch[4] = third (if any)
     const seg1 = cmatch[2];
     const seg2 = cmatch[3];
     const seg3 = cmatch[4];
@@ -216,7 +252,27 @@ function extractCallsFromLine(line: string, lineNumber: number): CallRef[] {
 
 // ─── Parser class ──────────────────────────────────────────────────────────
 
+/**
+ * Single-pass line-oriented parser for Genero BDL (`.4gl`) source files.
+ *
+ * Produces a {@link ParsedModule} containing:
+ *   - `IMPORT FGL` declarations
+ *   - All function signatures (public, private, type-methods, `MAIN`)
+ *   - Dialog blocks (`MENU`, `INPUT`, `CONSTRUCT`, `DISPLAY ARRAY`, `DIALOG`)
+ *   - Access-point handlers and the `CALL` statements inside them
+ *   - Direct `CALL` statements in plain function bodies
+ *
+ * The parser uses an explicit context stack to track nesting. Block comments
+ * (`{ ... }`) may span lines. Multi-line function declarations (parameter list
+ * wrapped across two or more lines) are joined before pattern matching.
+ */
 export class FglParser {
+  /**
+   * Parse a single `.4gl` source file and return all extracted data.
+   *
+   * @param filePath  Absolute path to the `.4gl` file.
+   * @returns         {@link ParsedModule} (returns an empty module on read error).
+   */
   parse(filePath: string): ParsedModule {
     const moduleName = path.basename(filePath, '.4gl');
     const result: ParsedModule = {
@@ -242,11 +298,30 @@ export class FglParser {
 
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
       const lineNumber = lineIdx + 1;
-      const [line, newBlockState] = stripComments(lines[lineIdx], inBlockComment);
+      let [line, newBlockState] = stripComments(lines[lineIdx], inBlockComment);
       inBlockComment = newBlockState;
       if (!line.trim()) { continue; }
 
       const top = stack[stack.length - 1];
+
+      // Join continuation lines when a FUNCTION declaration has unbalanced parens
+      // (e.g. parameter list wrapped across multiple lines).
+      if ((top.kind === 'ROOT' || top.kind === 'FUNCTION') &&
+          /^\s*(PUBLIC\s+|PRIVATE\s+)?FUNCTION\s/i.test(line)) {
+        let depth = 0;
+        for (const ch of line) {
+          if (ch === '(') { depth++; } else if (ch === ')') { depth--; }
+        }
+        while (depth > 0 && lineIdx + 1 < lines.length) {
+          lineIdx++;
+          const [nextLine, nextState] = stripComments(lines[lineIdx], inBlockComment);
+          inBlockComment = nextState;
+          line = line.trimEnd() + ' ' + nextLine.trim();
+          for (const ch of nextLine) {
+            if (ch === '(') { depth++; } else if (ch === ')') { depth--; }
+          }
+        }
+      }
 
       // ── IMPORT FGL (only at ROOT level) ─────────────────────────────────
       if (top.kind === 'ROOT') {
@@ -342,7 +417,7 @@ export class FglParser {
         while (stack.length > 1 && stack[stack.length - 1].kind !== 'FUNCTION') {
           stack.pop();
         }
-        // Pop the FUNCTION frame itself -- guard so ROOT is never popped by an unmatched END FUNCTION
+        // Pop the FUNCTION frame — guard so ROOT is never popped by an unmatched END FUNCTION
         if (stack.length > 0 && stack[stack.length - 1].kind === 'FUNCTION') {
           const funcFrame = stack.pop() as FunctionFrame;
           const sig: FunctionSignature = {
@@ -448,7 +523,6 @@ export class FglParser {
         else if (!newHandler) {
           const oc = R.onChangeFlds.exec(line);
           if (oc) {
-            // Create one handler whose name is the comma-joined field list
             newHandler = { kind: 'HANDLER', apType: 'ON_CHANGE', name: splitFields(oc[1]).join(', '), lineNumber, calls: [] };
           }
         }
@@ -517,11 +591,22 @@ export class FglParser {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
+  /**
+   * Return `true` when `kind` represents a dialog block (not a handler or function).
+   *
+   * @param kind  Context kind to test.
+   */
   private isDialogKind(kind: ContextKind): boolean {
     return ['MENU', 'INPUT', 'CONSTRUCT', 'DISPLAY_ARRAY', 'DIALOG'].includes(kind);
   }
 
-  /** Find the innermost dialog frame on the stack (skip HANDLER on top). */
+  /**
+   * Find the innermost dialog frame on the stack, skipping any `HANDLER` on top.
+   * Returns `null` when the top of stack is not a dialog context.
+   *
+   * @param stack  Current parser context stack.
+   * @returns      The innermost {@link DialogFrame}, or `null`.
+   */
   private findDialogTop(stack: ContextFrame[]): DialogFrame | null {
     for (let i = stack.length - 1; i >= 0; i--) {
       const f = stack[i];
@@ -532,6 +617,12 @@ export class FglParser {
     return null;
   }
 
+  /**
+   * Find the innermost `FUNCTION` frame on the stack (searching from top).
+   *
+   * @param stack  Current parser context stack.
+   * @returns      The innermost {@link FunctionFrame}, or `null` if outside a function.
+   */
   private findFunctionFrame(stack: ContextFrame[]): FunctionFrame | null {
     for (let i = stack.length - 1; i >= 0; i--) {
       if (stack[i].kind === 'FUNCTION') { return stack[i] as FunctionFrame; }
@@ -540,8 +631,12 @@ export class FglParser {
   }
 
   /**
-   * If the top of the stack is a HANDLER, commit it as an AccessPoint
-   * on the result and pop it.
+   * If the top of the stack is a `HANDLER` frame, commit it as an
+   * {@link AccessPoint} on `result` and pop it from the stack.
+   * Called before every handler opener and every dialog/function closer.
+   *
+   * @param stack   Current parser context stack (mutated in place).
+   * @param result  Accumulator for the module being parsed.
    */
   private commitHandler(stack: ContextFrame[], result: ParsedModule): void {
     if (stack[stack.length - 1]?.kind !== 'HANDLER') { return; }
@@ -561,7 +656,13 @@ export class FglParser {
     });
   }
 
-  /** Pop frames from the stack until the matching dialog frame is removed. */
+  /**
+   * Pop frames from the stack until the matching dialog frame of `kind` is removed.
+   * Any intervening frames (e.g. a dangling `HANDLER`) are discarded silently.
+   *
+   * @param stack  Current parser context stack (mutated in place).
+   * @param kind   Dialog frame kind to pop up to and including.
+   */
   private popDialog(stack: ContextFrame[], kind: DialogFrame['kind']): void {
     while (stack.length > 1) {
       const top = stack[stack.length - 1];

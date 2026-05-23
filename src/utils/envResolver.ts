@@ -1,41 +1,52 @@
 import * as vscode from 'vscode';
 
+/**
+ * Ordered collection of directory lists used to locate `.4gl` module files,
+ * mirroring Genero's own module-resolution strategy.
+ */
 export interface SearchPaths {
-  /** Directory containing the entry .4gl file — searched first, matching Genero runtime behaviour */
+  /** Directory containing the entry `.4gl` file — searched first, matching Genero runtime behaviour. */
   currentDir: string;
-  /** VS Code workspace folders */
+  /** VS Code workspace folders. */
   workspace: string[];
-  /** From FGLLDPATH environment variable (or settings override) */
+  /** From the `FGLLDPATH` environment variable (or the `moduleDiagram.fglldpath` setting). */
   fglldpath: string[];
-  /** From FGLRESOURCEPATH environment variable (or settings override) */
+  /** From the `FGLRESOURCEPATH` environment variable (or the `moduleDiagram.fglresourcepath` setting). */
   fglresourcepath: string[];
-  /** From DBPATH environment variable */
+  /** From the `DBPATH` environment variable. */
   dbpath: string[];
-  /** From PATH environment variable */
+  /** From the `PATH` environment variable. */
   systemPath: string[];
 }
 
 const IS_WINDOWS = process.platform === 'win32';
 const PATH_SEP = IS_WINDOWS ? ';' : ':';
 
+/**
+ * Split an OS path-list environment variable value into individual directory strings.
+ *
+ * @param value  Raw value of the environment variable (may be `undefined`).
+ * @returns      Array of non-empty, trimmed directory paths.
+ */
 function splitVar(value: string | undefined): string[] {
   if (!value) { return []; }
   return value.split(PATH_SEP).map(p => p.trim()).filter(p => p.length > 0);
 }
 
 /**
- * Build the ordered list of directories to search for .4gl module files.
+ * Build the ordered collection of directories to search for `.4gl` module files.
  *
  * Priority (first match wins):
- *   1. Directory of the entry .4gl file (current directory — Genero always searches here first)
- *   2. VS Code workspace folders (recursive)
- *   3. FGLLDPATH  (config override, then env)
- *   4. FGLRESOURCEPATH (config override, then env)
- *   5. DBPATH
- *   6. PATH
+ *   1. Directory of the entry `.4gl` file — Genero always searches here first.
+ *   2. VS Code workspace folders (recursive).
+ *   3. `FGLLDPATH` (settings override, then environment).
+ *   4. `FGLRESOURCEPATH` (settings override, then environment).
+ *   5. `DBPATH`.
+ *   6. `PATH`.
  *
- * @param entryFileDir  Absolute path to the directory containing the entry .4gl file.
- *                      Pass path.dirname(entryFilePath) from the command handler.
+ * @param entryFileDir  Absolute path to the directory containing the entry `.4gl` file.
+ *                      Pass `path.dirname(entryFilePath)` from the command handler.
+ * @returns             Populated {@link SearchPaths} object.
  */
 export function resolveSearchPaths(entryFileDir: string): SearchPaths {
   const cfg = vscode.workspace.getConfiguration('moduleDiagram');
@@ -57,8 +68,11 @@ export function resolveSearchPaths(entryFileDir: string): SearchPaths {
 }
 
 /**
- * Flat ordered list of all directories to search, in priority order.
- * currentDir is always first so it mirrors Genero's own module resolution.
+ * Flatten a {@link SearchPaths} object into an ordered list of directories to
+ * search, with `currentDir` always first so it mirrors Genero's own resolution.
+ *
+ * @param paths  Populated search-paths object from {@link resolveSearchPaths}.
+ * @returns      Flat ordered array of directory strings.
  */
 export function allSearchDirs(paths: SearchPaths): string[] {
   return [

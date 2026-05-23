@@ -1,11 +1,23 @@
-﻿import * as vscode from 'vscode';
+import * as vscode from 'vscode';
 import * as path from 'path';
 import { AppGraph, DiagramOptions } from '../types';
 import { renderAscii } from './AsciiRenderer';
 
-const WEBVIEW_VERSION = '0.17';
+const WEBVIEW_VERSION = '0.18';
 const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
+/**
+ * Singleton webview panel that displays the Genero BDL call-graph diagram.
+ *
+ * Only one panel is kept alive at a time. Calling {@link getOrCreate} returns
+ * the existing instance (and reveals it) if one already exists, or creates a
+ * new one otherwise.
+ *
+ * The panel communicates with its HTML content via `postMessage` / `onDidReceiveMessage`:
+ *   - Outgoing (`updateGraph`): pushes a fresh ASCII diagram and statistics string.
+ *   - Incoming (`navigate`, `refresh`, `export`, `exportHtml`, `cancel`): user actions
+ *     from the toolbar buttons and Mermaid node clicks.
+ */
 export class DiagramPanel {
   private static instance: DiagramPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
@@ -15,6 +27,13 @@ export class DiagramPanel {
   private onRefreshRequest:  ((opts: DiagramOptions) => void) | undefined;
   private onCancelRequest:   (() => void) | undefined;
 
+  /**
+   * Private constructor — use {@link getOrCreate} instead.
+   *
+   * @param context     Extension context (used for subscriptions and global state).
+   * @param entryLabel  Module stem of the entry file, shown in the panel title.
+   * @param options     Initial diagram options from workspace settings.
+   */
   private constructor(
     context: vscode.ExtensionContext,
     entryLabel: string,
@@ -64,6 +83,14 @@ export class DiagramPanel {
     }, undefined, context.subscriptions);
   }
 
+  /**
+   * Return the existing panel instance (revealing it if hidden), or create a new one.
+   *
+   * @param context     Extension context.
+   * @param entryLabel  Module stem of the entry file.
+   * @param options     Initial diagram options.
+   * @returns           The active {@link DiagramPanel} instance.
+   */
   static getOrCreate(
     context: vscode.ExtensionContext,
     entryLabel: string,
@@ -77,18 +104,36 @@ export class DiagramPanel {
     return DiagramPanel.instance;
   }
 
+  /**
+   * Register the callback invoked when the user clicks **Refresh** in the toolbar.
+   * The callback receives the current (possibly user-modified) {@link DiagramOptions}.
+   *
+   * @param cb  Async rebuild function defined in `extension.ts`.
+   */
   setRefreshCallback(cb: (opts: DiagramOptions) => void): void {
     this.onRefreshRequest = cb;
   }
 
+  /**
+   * Register (or clear) the callback invoked when the user clicks **Cancel**.
+   *
+   * @param cb  Cancel handler, or `undefined` to detach.
+   */
   setCancelCallback(cb: (() => void) | undefined): void {
     this.onCancelRequest = cb;
   }
 
+  /** Dispose the underlying webview panel and release the singleton reference. */
   dispose(): void {
     this.panel.dispose();
   }
 
+  /**
+   * Push a freshly built graph to the webview for display.
+   * Renders the graph as ASCII and posts an `update` message.
+   *
+   * @param graph  Application graph from {@link GraphBuilder.build}.
+   */
   updateGraph(graph: AppGraph): void {
     const { ascii, nodeCount, edgeCount } = renderAscii(graph);
     this.panel.webview.postMessage({
@@ -98,6 +143,13 @@ export class DiagramPanel {
     });
   }
 
+  /**
+   * Open the source file at the given line in the VS Code editor.
+   * Called in response to a `navigate` message from the webview.
+   *
+   * @param filePath    Absolute path to the source file.
+   * @param lineNumber  1-based line number to scroll to.
+   */
   private navigateTo(filePath: string, lineNumber: number): void {
     const uri = vscode.Uri.file(filePath);
     const pos = new vscode.Position(Math.max(0, lineNumber - 1), 0);
@@ -108,6 +160,12 @@ export class DiagramPanel {
     });
   }
 
+  /**
+   * Prompt the user for a save location and write the ASCII diagram as a
+   * self-contained HTML file with dark-theme styling.
+   *
+   * @param asciiData  ASCII diagram text from the webview.
+   */
   private async exportDiagramHtml(asciiData: string): Promise<void> {
     if (!asciiData) {
       vscode.window.showWarningMessage('No diagram generated yet.');
@@ -154,6 +212,11 @@ export class DiagramPanel {
     vscode.window.showInformationMessage(`Diagram saved to ${uri.fsPath}`);
   }
 
+  /**
+   * Prompt the user for a save location and write the ASCII diagram as plain text.
+   *
+   * @param asciiData  ASCII diagram text from the webview.
+   */
   private async exportDiagram(asciiData: string): Promise<void> {
     if (!asciiData) {
       vscode.window.showWarningMessage('No diagram generated yet.');
@@ -176,6 +239,12 @@ export class DiagramPanel {
     vscode.window.showInformationMessage(`Diagram saved to ${uri.fsPath}`);
   }
 
+  /**
+   * Generate the static HTML content loaded into the webview panel.
+   * Uses a per-session nonce to satisfy the Content-Security-Policy.
+   *
+   * @returns  Full HTML document string.
+   */
   private buildHtml(): string {
     const opts = this.currentOptions;
     const nonce = Math.random().toString(36).slice(2);

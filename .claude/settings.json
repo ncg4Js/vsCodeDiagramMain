@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" add package.json src/extension.ts src/utils/logger.ts src/diagram/webview.ts)",
+      "Bash(git -C c:/work/VsCode/vs_code_app_diagram commit -m ' *)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" add src/diagram/AsciiRenderer.ts src/diagram/webview.ts)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" add src/extension.ts src/diagram/AsciiRenderer.ts src/diagram/webview.ts)",
+      "Bash(git -C \"c:/work/VsCode/vs_code_app_diagram\" add src/extension.ts src/diagram/webview.ts)",
+      "Bash(vsce package *)",
+      "Bash(code --install-extension \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-bdl-diagram-0.1.1.vsix\")",
+      "Bash(npm install *)"
+    ]
+  }
+}

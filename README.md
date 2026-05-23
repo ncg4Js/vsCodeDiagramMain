@@ -76,6 +76,8 @@ npm run compile
 
 ```bash
 vsce package
+or
+npm run package
 ```
 
 This produces `genero-app-diagram-0.1.0.vsix` in the current directory.

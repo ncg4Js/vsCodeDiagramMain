@@ -1,5 +1,6 @@
-﻿import { AppGraph, GraphNode, GraphEdge, DiagramOptions, NodeType } from '../types';
+import { AppGraph, GraphNode, GraphEdge, DiagramOptions, NodeType } from '../types';
 
+/** Characters that need escaping inside Mermaid node label strings. */
 const MERMAID_ESCAPE: [RegExp, string][] = [
   [/"/g,  '#quot;'],
   [/</g,  '#lt;'],
@@ -9,16 +10,34 @@ const MERMAID_ESCAPE: [RegExp, string][] = [
   [/\)/g, '#rpar;'],
 ];
 
+/**
+ * Escape a string so it is safe to embed inside a Mermaid node label.
+ *
+ * @param s  Raw label text.
+ * @returns  Escaped label text.
+ */
 function escapeMermaid(s: string): string {
   let out = s;
   for (const [re, sub] of MERMAID_ESCAPE) { out = out.replace(re, sub); }
   return out;
 }
 
+/**
+ * Sanitise a string for use as a Mermaid node ID (alphanumeric + underscore only).
+ *
+ * @param s  Raw identifier string.
+ * @returns  Safe ID string.
+ */
 function safeId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
+/**
+ * Return the Mermaid shape syntax (label + delimiters) for a graph node.
+ *
+ * @param node  Graph node whose type determines the shape.
+ * @returns     Mermaid shape string, e.g. `("label")` or `["label"]`.
+ */
 function nodeShape(node: GraphNode): string {
   const lbl = escapeMermaid(node.label);
   switch (node.type as NodeType) {
@@ -35,6 +54,12 @@ function nodeShape(node: GraphNode): string {
   }
 }
 
+/**
+ * Return the Mermaid arrow syntax for a graph edge type.
+ *
+ * @param type  Edge type from the graph model.
+ * @returns     Mermaid arrow string, e.g. `"-->"` or `"-.->"`.
+ */
 function edgeArrow(type: GraphEdge['type']): string {
   switch (type) {
     case 'imports':       return '-->';
@@ -48,6 +73,12 @@ function edgeArrow(type: GraphEdge['type']): string {
   }
 }
 
+/**
+ * Render a single graph edge as a Mermaid flowchart line.
+ *
+ * @param edge  Graph edge to serialise.
+ * @returns     Indented Mermaid edge line, e.g. `"    A --> B"`.
+ */
 function edgeLine(edge: GraphEdge): string {
   const arrow = edgeArrow(edge.type);
   if (edge.label) {
@@ -56,16 +87,32 @@ function edgeLine(edge: GraphEdge): string {
   return `    ${edge.from} ${arrow} ${edge.to}`;
 }
 
+/** Result produced by {@link renderMermaid}. */
 export interface RenderResult {
+  /** Complete Mermaid `flowchart TD` diagram text. */
   mermaid: string;
+  /** Total number of nodes included. */
   nodeCount: number;
+  /** Total number of edges included. */
   edgeCount: number;
 }
 
+/**
+ * Render an {@link AppGraph} as a Mermaid `flowchart TD` diagram.
+ *
+ * Function nodes are grouped into `subgraph` blocks per module. All nodes
+ * receive click handlers that post a `navigate` message back to the extension
+ * host so VS Code can open the corresponding source file.
+ *
+ * @param graph    Application graph produced by {@link GraphBuilder.build}.
+ * @param options  Diagram options (currently unused in the renderer itself but
+ *                 kept for forward compatibility).
+ * @returns        {@link RenderResult} with the Mermaid text and graph statistics.
+ */
 export function renderMermaid(graph: AppGraph, options: DiagramOptions): RenderResult {
   const lines: string[] = ['flowchart TD'];
 
-  // Partition nodes into groups
+  // Partition nodes into per-module groups (for subgraphs) and top-level
   const moduleGroups = new Map<string, GraphNode[]>();
   const topLevelNodes: GraphNode[] = [];
 
@@ -129,6 +176,12 @@ export function renderMermaid(graph: AppGraph, options: DiagramOptions): RenderR
   };
 }
 
+/**
+ * Map a {@link NodeType} to its Mermaid `classDef` name.
+ *
+ * @param type  Node type.
+ * @returns     CSS class name string, or `null` if no style is defined for this type.
+ */
 function nodeClass(type: NodeType): string | null {
   switch (type) {
     case 'entry':                                      return 'entryStyle';
