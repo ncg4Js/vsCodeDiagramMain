@@ -12,7 +12,7 @@ function looksLike4glSource(filePath: string): boolean {
   try {
     const buf = fs.readFileSync(filePath);
     const content = buf.subarray(0, 64 * 1024).toString('utf8');
-    return /^\s*(MAIN\b|END\s+MAIN\b|(PUBLIC|PRIVATE)\s+FUNCTION\s+\w|FUNCTION\s+\w|IMPORT\s+FGL\s+|IMPORT\s+JAVA\s+|DATABASE\s+\w|SCHEMA\s+\w)/im.test(content);
+    return /^\s*(MAIN\b|END\s+(MAIN|FUNCTION|RECORD)\b|(PUBLIC|PRIVATE)\s+FUNCTION\s+\w|FUNCTION\s+\w|IMPORT\s+(FGL|JAVA)\s+|DATABASE\s+\w|SCHEMA\s+\w|TYPE\s+\w|DEFINE\s+\w|CONSTANT\s+\w)/im.test(content);
   } catch {
     return false;
   }
@@ -88,6 +88,13 @@ export function activate(context: vscode.ExtensionContext): void {
               log('Traversing call graph...');                await tick();
               const builder     = new GraphBuilder(resolver);
               const graph       = builder.build(filePath, opts, () => cancelFlag);
+              const hasEntryPoints = graph.nodes.has('ENTRY_MAIN') ||
+                [...graph.nodes.values()].some(n => n.type === 'function');
+              if (!hasEntryPoints) {
+                vscode.window.showErrorMessage('No entry points in this file');
+                panel.dispose();
+                return;
+              }
               log('Rendering diagram...');                    await tick();
               panel.updateGraph(graph);
               log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);
