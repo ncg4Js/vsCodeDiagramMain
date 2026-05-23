@@ -173,7 +173,7 @@ export class DiagramPanel {
       <option value="-1" ${opts.maxDepth === -1 ? 'selected' : ''}>Unlimited</option>
     </select>
   </label>
-  <label><input type="checkbox" id="chk-private"  ${opts.showPrivate         ? 'checked' : ''}> PRIVATE functions</label>
+  <label><input type="checkbox" id="chk-private"  ${opts.showPrivate         ? 'checked' : ''}> Include PRIVATE</label>
   <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents     ? 'checked' : ''}> Field events</label>
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>

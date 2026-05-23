@@ -8,7 +8,14 @@
       "PowerShell(\\(Get-Item 'c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-app-diagram-0.1.0.vsix'\\).LastWriteTime)",
       "Bash(npx tsc *)",
       "Bash(code --install-extension \"C:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-app-diagram-0.1.0.vsix\" --force)",
-      "Bash(code --install-extension \"genero-app-diagram-0.1.0.vsix\" --force)"
+      "Bash(code --install-extension \"genero-app-diagram-0.1.0.vsix\" --force)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(code --install-extension \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\genero-app-diagram-0.1.0.vsix\" --force)",
+      "Bash(code --command workbench.action.reloadWindow)",
+      "Bash(code --install-extension \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\module-diagram-0.1.0.vsix\" --force)",
+      "Bash(dir \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\\\\resources\")",
+      "Bash(dir \"c:\\\\work\\\\VsCode\\\\vs_code_app_diagram\" /b)"
     ],
     "additionalDirectories": [
       "C:\\Users\\ncgod\\.claude"
