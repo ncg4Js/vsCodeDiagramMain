@@ -1,6 +1,6 @@
 {
-  "name": "module-diagram",
-  "displayName": "Module Diagram",
+  "name": "genero-bdl-diagram",
+  "displayName": "Genero BDL Diagram",
   "description": "Generate dependency and call-flow diagrams for Genero BDL (.4gl) applications",
   "version": "0.1.0",
   "publisher": "fourjs",
@@ -23,7 +23,7 @@
     "commands": [
       {
         "command": "module-diagram.generate",
-        "title": "Module Diagram: Generate",
+        "title": "Genero BDL Diagram: Generate",
         "icon": "$(type-hierarchy)"
       }
     ],
@@ -44,7 +44,7 @@
       ]
     },
     "configuration": {
-      "title": "Module Diagram",
+      "title": "Genero BDL Diagram",
       "properties": {
         "moduleDiagram.fglldpath": {
           "type": "string",

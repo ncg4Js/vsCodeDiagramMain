@@ -131,7 +131,7 @@ export class DiagramPanel {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Module Diagram: ${this.entryLabel}</title>
+<title>Genero BDL Diagram: ${this.entryLabel}</title>
 <style>
   body { margin: 0; padding: 24px; background: #1e1e1e; color: #d4d4d4;
          font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: 13px; }
@@ -140,7 +140,7 @@ export class DiagramPanel {
 </style>
 </head>
 <body>
-<h1>Module Diagram: ${this.entryLabel}</h1>
+<h1>Genero BDL Diagram: ${this.entryLabel}</h1>
 <pre>${escaped}</pre>
 </body>
 </html>`;

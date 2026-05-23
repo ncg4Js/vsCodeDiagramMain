@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
         panel.setCancelCallback(() => { cancelFlag = true; });
         showChannel();
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: 'Module Diagram', cancellable: true },
+          { location: vscode.ProgressLocation.Notification, title: 'Genero BDL Diagram', cancellable: true },
           async (progress, token) => {
             token.onCancellationRequested(() => { cancelFlag = true; });
             setProgressReporter(msg => progress.report({ message: msg }));
@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext): void {
             } catch (err) {
               const errMsg = (err as Error).message;
               log(`Error: ${errMsg}`);
-              vscode.window.showErrorMessage(`Module Diagram: failed to build graph — ${errMsg}`);
+              vscode.window.showErrorMessage(`Genero BDL Diagram: failed to build graph — ${errMsg}`);
             } finally {
               setProgressReporter(undefined);
             }
