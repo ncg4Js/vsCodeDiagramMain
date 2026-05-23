@@ -1,11 +1,22 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { resolveSearchPaths } from './utils/envResolver';
 import { ModuleResolver } from './parser/ModuleResolver';
 import { GraphBuilder } from './parser/GraphBuilder';
 import { DiagramPanel } from './diagram/webview';
 import { DiagramOptions } from './types';
 import { initLogger, setProgressReporter, log, showChannel } from './utils/logger';
+
+function looksLike4glSource(filePath: string): boolean {
+  try {
+    const buf = fs.readFileSync(filePath);
+    const content = buf.subarray(0, 64 * 1024).toString('utf8');
+    return /^\s*(MAIN\b|END\s+MAIN\b|(PUBLIC|PRIVATE)\s+FUNCTION\s+\w|FUNCTION\s+\w|IMPORT\s+FGL\s+|IMPORT\s+JAVA\s+|DATABASE\s+\w|SCHEMA\s+\w)/im.test(content);
+  } catch {
+    return false;
+  }
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   initLogger(context);
@@ -33,7 +44,15 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       const filePath   = targetUri.fsPath;
-      const entryDir   = path.dirname(filePath);   // current directory — searched first
+
+      if (!looksLike4glSource(filePath)) {
+        vscode.window.showErrorMessage(
+          `Genero BDL Diagram: "${path.basename(filePath)}" does not appear to be a valid Genero BDL source file.`
+        );
+        return;
+      }
+
+      const entryDir   = path.dirname(filePath);
       const entryLabel = path.basename(filePath, '.4gl');
 
       const cfg = vscode.workspace.getConfiguration('moduleDiagram');
@@ -69,10 +88,6 @@ export function activate(context: vscode.ExtensionContext): void {
               log('Traversing call graph...');                await tick();
               const builder     = new GraphBuilder(resolver);
               const graph       = builder.build(filePath, opts, () => cancelFlag);
-              if (!graph.nodes.has('ENTRY_MAIN')) {
-                vscode.window.showErrorMessage('No main entry point in this file');
-                return;
-              }
               log('Rendering diagram...');                    await tick();
               panel.updateGraph(graph);
               log(`Done — ${graph.nodes.size} nodes, ${graph.edges.length} edges.`);

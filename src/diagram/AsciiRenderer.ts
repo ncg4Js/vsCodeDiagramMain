@@ -34,17 +34,8 @@ export function renderAscii(graph: AppGraph): AsciiResult {
     out.set(edge.from, list);
   }
 
-  const entry = [...graph.nodes.values()].find(n => n.type === 'entry');
-  if (!entry) {
-    return { ascii: '(no entry node found)', nodeCount: 0, edgeCount: 0 };
-  }
-
   const lines: string[] = [];
-
-  lines.push('◆ ' + entry.label);
-  lines.push('');
-
-  const visited = new Set<string>([entry.id]);
+  const visited = new Set<string>();
 
   function walk(nodeId: string, prefix: string, isLast: boolean): void {
     const node = graph.nodes.get(nodeId);
@@ -66,9 +57,31 @@ export function renderAscii(graph: AppGraph): AsciiResult {
     }
   }
 
-  const roots = out.get(entry.id) ?? [];
-  for (let i = 0; i < roots.length; i++) {
-    walk(roots[i], '', i === roots.length - 1);
+  const entry = [...graph.nodes.values()].find(n => n.type === 'entry');
+
+  if (entry) {
+    lines.push('◆ ' + entry.label);
+    lines.push('');
+    visited.add(entry.id);
+    const roots = out.get(entry.id) ?? [];
+    for (let i = 0; i < roots.length; i++) {
+      walk(roots[i], '', i === roots.length - 1);
+    }
+  } else {
+    // No MAIN — use the entry module node as root so all functions are reachable
+    const entryModule = [...graph.nodes.values()].find(
+      n => n.type === 'module' && n.moduleName === graph.entryModuleName,
+    );
+    if (!entryModule) {
+      return { ascii: '(nothing to render)', nodeCount: graph.nodes.size, edgeCount: graph.edges.length };
+    }
+    lines.push('▣ ' + entryModule.label + '  (no MAIN)');
+    lines.push('');
+    visited.add(entryModule.id);
+    const roots = out.get(entryModule.id) ?? [];
+    for (let i = 0; i < roots.length; i++) {
+      walk(roots[i], '', i === roots.length - 1);
+    }
   }
 
   lines.push('');
