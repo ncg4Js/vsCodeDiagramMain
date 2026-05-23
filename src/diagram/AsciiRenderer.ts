@@ -72,7 +72,7 @@ export function renderAscii(graph: AppGraph): AsciiResult {
   }
 
   lines.push('');
-  lines.push('◆ entry  ▣ module  ○ function  ◇ dialog/menu/input  □ external  ↺ already shown above');
+  lines.push('◆ entry  ▣ module  ○ function  ◇ dialog/menu/input  □ external  ↺ already shown above  + public  - private');
 
   return { ascii: lines.join('\n'), nodeCount: graph.nodes.size, edgeCount: graph.edges.length };
 }
