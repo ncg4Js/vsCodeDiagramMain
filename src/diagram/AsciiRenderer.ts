@@ -40,12 +40,9 @@ export function renderAscii(graph: AppGraph): AsciiResult {
   }
 
   const lines: string[] = [];
-  const width = Math.max(entry.label.length + 6, 52);
 
-  // Header box
-  lines.push('┌' + '─'.repeat(width) + '┐');
-  lines.push('│  ◆ ' + entry.label.padEnd(width - 3) + '│');
-  lines.push('└' + '─'.repeat(width) + '┘');
+  lines.push('◆ ' + entry.label);
+  lines.push('');
 
   const visited = new Set<string>([entry.id]);
 

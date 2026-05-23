@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AppGraph, DiagramOptions } from '../types';
 import { renderAscii } from './AsciiRenderer';
 
-const WEBVIEW_VERSION = '0.13';
+const WEBVIEW_VERSION = '0.14';
 const LAST_FOLDER_KEY = 'lastDiagramFolder';
 
 export class DiagramPanel {
@@ -54,6 +54,9 @@ export class DiagramPanel {
         case 'export':
           this.exportDiagram(msg.data as string);
           break;
+        case 'exportHtml':
+          this.exportDiagramHtml(msg.data as string);
+          break;
         case 'cancel':
           this.onCancelRequest?.();
           break;
@@ -99,6 +102,52 @@ export class DiagramPanel {
       viewColumn:  vscode.ViewColumn.One,
       preserveFocus: false,
     });
+  }
+
+  private async exportDiagramHtml(asciiData: string): Promise<void> {
+    if (!asciiData) {
+      vscode.window.showWarningMessage('No diagram generated yet.');
+      return;
+    }
+    const lastFolder = this.context.globalState.get<string>(LAST_FOLDER_KEY);
+    const safeName   = this.entryLabel.replace(/\W+/g, '_');
+    const timestamp  = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const suggested  = lastFolder
+      ? vscode.Uri.file(path.join(lastFolder, `${safeName}_${timestamp}.html`))
+      : vscode.Uri.file(`${safeName}_${timestamp}.html`);
+
+    const uri = await vscode.window.showSaveDialog({
+      defaultUri: suggested,
+      filters:    { 'HTML files': ['html'] },
+    });
+    if (!uri) { return; }
+
+    const escaped = asciiData
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Module Diagram: ${this.entryLabel}</title>
+<style>
+  body { margin: 0; padding: 24px; background: #1e1e1e; color: #d4d4d4;
+         font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace; font-size: 13px; }
+  h1   { margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #9cdcfe; }
+  pre  { margin: 0; white-space: pre; line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>Module Diagram: ${this.entryLabel}</h1>
+<pre>${escaped}</pre>
+</body>
+</html>`;
+
+    await this.context.globalState.update(LAST_FOLDER_KEY, path.dirname(uri.fsPath));
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(html, 'utf8'));
+    vscode.window.showInformationMessage(`Diagram saved to ${uri.fsPath}`);
   }
 
   private async exportDiagram(asciiData: string): Promise<void> {
@@ -177,7 +226,8 @@ export class DiagramPanel {
   <label><input type="checkbox" id="chk-fields"   ${opts.showFieldEvents     ? 'checked' : ''}> Field events</label>
   <label><input type="checkbox" id="chk-external" ${opts.showExternalModules ? 'checked' : ''}> External modules</label>
   <button id="btn-refresh">&#8635; Refresh</button>
-  <button id="btn-export">&#8615; Save</button>
+  <button id="btn-export">&#8615; Save to Text</button>
+  <button id="btn-export-html">&#8615; Save to HTML</button>
   <button id="btn-cancel">&#10005; Cancel</button>
   <span id="stats"></span>
   <span id="ver" style="font-size:10px;opacity:0.5;margin-left:6px">v${WEBVIEW_VERSION}</span>
@@ -203,6 +253,10 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
 
 document.getElementById('btn-export').addEventListener('click', () => {
   if (diagramText) { vscode.postMessage({ type: 'export', data: diagramText }); }
+});
+
+document.getElementById('btn-export-html').addEventListener('click', () => {
+  if (diagramText) { vscode.postMessage({ type: 'exportHtml', data: diagramText }); }
 });
 
 document.getElementById('btn-cancel').addEventListener('click', () => {
